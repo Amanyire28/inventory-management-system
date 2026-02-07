@@ -769,21 +769,23 @@ async function loadSalesTable(statusFilter = 'all') {
         // Display sales
         const tbody = document.getElementById('salesTableBody');
         if (filteredSales.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No sales found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No sales found</td></tr>';
             return;
         }
 
         tbody.innerHTML = filteredSales.map(s => `
             <tr>
                 <td>${s.id}</td>
-                <td>${formatDateTime(s.transaction_date || s.created_at)}</td>
-                <td>${s.item_count || 0} items</td>
-                <td>UGX ${parseFloat(s.total_amount || 0).toFixed(0)}</td>
-                <td><span class="badge badge-${s.status === 'DRAFT' ? 'warning' : s.status === 'COMPLETE' ? 'success' : 'inactive'}">${s.status}</span></td>
+                <td>${formatDateTime(s.transaction_date)}</td>
+                <td>${s.cashier_name || 'Unknown'}</td>
+                <td>${s.product_name || 'N/A'}</td>
+                <td>${s.quantity || 0}</td>
+                <td>UGX ${safeNumber(s.total_amount).toFixed(0)}</td>
+                <td><span class="badge badge-${s.status === 'DRAFT' ? 'warning' : s.status === 'COMMITTED' ? 'success' : s.status === 'REVERSED' ? 'inactive' : 'secondary'}">${s.status}</span></td>
                 <td>
-                    ${s.status === 'COMPLETE' ? 
+                    ${s.status === 'COMMITTED' ? 
                         `<button class="btn btn-sm btn-warning" onclick="reverseSale(${s.id})">Reverse</button>` : 
-                        '-'
+                        s.status === 'REVERSED' ? 'Reversed' : '-'
                     }
                 </td>
             </tr>

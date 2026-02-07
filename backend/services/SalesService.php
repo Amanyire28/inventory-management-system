@@ -287,30 +287,37 @@ class SalesService {
             return [];
         }
         
-        // Get grouped sales transactions by date/time
+        // Build query to get individual sales transactions
         $sql = "SELECT 
-                    MIN(t.id) as id,
+                    t.id,
                     t.transaction_date,
                     t.created_by,
-                    u.full_name as created_by_name,
-                    SUM(t.total_amount) as total_amount,
-                    COUNT(*) as items,
+                    u.full_name as cashier_name,
+                    p.name as product_name,
+                    t.quantity,
+                    t.total_amount,
+                    t.status,
                     t.period_id
                 FROM transactions t
                 JOIN users u ON t.created_by = u.id
-                WHERE t.type = 'SALE' 
-                    AND t.status = 'COMMITTED'
-                    AND t.created_by = ?";
+                JOIN products p ON t.product_id = p.id
+                WHERE t.type = 'SALE'";
         
-        $params = [$user['user_id']];
+        $params = [];
+        
+        // If user is a cashier, only show their own sales
+        // If user is an admin, show all sales
+        if ($user['role'] === 'cashier') {
+            $sql .= " AND t.created_by = ?";
+            $params[] = $user['user_id'];
+        }
         
         if ($period_id) {
             $sql .= " AND t.period_id = ?";
             $params[] = $period_id;
         }
         
-        $sql .= " GROUP BY DATE(t.transaction_date), HOUR(t.transaction_date), MINUTE(t.transaction_date), t.created_by
-                  ORDER BY t.transaction_date DESC 
+        $sql .= " ORDER BY t.transaction_date DESC, t.id DESC
                   LIMIT ?";
         
         $params[] = $limit;
