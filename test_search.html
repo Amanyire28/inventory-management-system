@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .search-wrapper {
+            position: relative;
+            margin: 20px 0;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            border: 2px solid #0ea5e9;
+            border-radius: 8px;
+        }
+        .dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 2px solid #0ea5e9;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .dropdown.active {
+            display: block;
+        }
+        .dropdown-item {
+            padding: 12px;
+            border-bottom: 1px solid #e0f2fe;
+            cursor: pointer;
+        }
+        .dropdown-item:hover {
+            background-color: #e0f2fe;
+        }
+        #debug {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Product Search Test</h1>
+    
+    <div class="search-wrapper">
+        <input type="text" id="searchInput" placeholder="Type to search products..." autocomplete="off">
+        <div id="dropdown" class="dropdown"></div>
+    </div>
+    
+    <div id="debug"></div>
+    
+    <script>
+        const API_BASE = '/topinv/api';
+        let products = [];
+        const debugEl = document.getElementById('debug');
+        
+        function log(message) {
+            const time = new Date().toLocaleTimeString();
+            debugEl.innerHTML += `[${time}] ${message}<br>`;
+            console.log(message);
+        }
+        
+        // Load products
+        async function loadProducts() {
+            try {
+                log('🔄 Loading products...');
+                const token = sessionStorage.getItem('authToken');
+                
+                if (!token) {
+                    log('❌ No auth token found. Please login first.');
+                    return;
+                }
+                
+                log('🔑 Token found: ' + token.substring(0, 20) + '...');
+                
+                const response = await fetch(`${API_BASE}/products`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                log(`📡 Response status: ${response.status} ${response.statusText}`);
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    log('❌ Error: ' + (data.message || 'Failed to load products'));
+                    return;
+                }
+                
+                products = data.data.products.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    code: p.code || 'N/A',
+                    price: parseFloat(p.selling_price),
+                    stock: parseInt(p.current_stock),
+                    status: p.status
+                }));
+                
+                log(`✅ Loaded ${products.length} products`);
+                log(`📦 Sample: ${products[0]?.name}`);
+            } catch (error) {
+                log('❌ Exception: ' + error.message);
+            }
+        }
+        
+        // Initialize search
+        function initSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const dropdown = document.getElementById('dropdown');
+            
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase().trim();
+                
+                log(`🔍 Searching: "${searchTerm}"`);
+                
+                if (searchTerm.length === 0) {
+                    dropdown.classList.remove('active');
+                    return;
+                }
+                
+                if (products.length === 0) {
+                    dropdown.innerHTML = '<div class="dropdown-item">Loading products...</div>';
+                    dropdown.classList.add('active');
+                    return;
+                }
+                
+                const filtered = products.filter(p => 
+                    p.status === 'active' && (
+                        p.name.toLowerCase().includes(searchTerm) || 
+                        (p.code && p.code.toLowerCase().includes(searchTerm))
+                    )
+                );
+                
+                log(`✅ Found ${filtered.length} matches`);
+                
+                if (filtered.length > 0) {
+                    dropdown.innerHTML = filtered.slice(0, 10).map(p => `
+                        <div class="dropdown-item">
+                            <strong>${p.name}</strong><br>
+                            <small>Code: ${p.code} | Stock: ${p.stock} | Price: ₱${p.price.toFixed(2)}</small>
+                        </div>
+                    `).join('');
+                    dropdown.classList.add('active');
+                } else {
+                    dropdown.innerHTML = '<div class="dropdown-item">No products found</div>';
+                    dropdown.classList.add('active');
+                }
+            });
+        }
+        
+        // Initialize
+        log('🚀 Starting test...');
+        loadProducts();
+        initSearch();
+    </script>
+</body>
+</html>

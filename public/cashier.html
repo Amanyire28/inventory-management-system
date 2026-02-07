@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOPINV - Cashier Dashboard</title>
+    <link rel="stylesheet" href="/topinv/public/css/style.css">
+    <link rel="stylesheet" href="/topinv/public/css/cashier.css">
+</head>
+<body class="cashier-dashboard">
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>TOPINV</h2>
+                <p class="user-role">Cashier</p>
+            </div>
+
+            <nav class="sidebar-nav">
+                <a href="#new-sale" class="nav-item active" data-section="new-sale">
+                    <span class="icon">📋</span>
+                    <span>New Sale</span>
+                </a>
+                <a href="#search" class="nav-item" data-section="search">
+                    <span class="icon">🔍</span>
+                    <span>Search</span>
+                </a>
+                <a href="#receipts" class="nav-item" data-section="receipts">
+                    <span class="icon">📜</span>
+                    <span>My Receipts</span>
+                </a>
+                <a href="#summary" class="nav-item" data-section="summary">
+                    <span class="icon">📊</span>
+                    <span>Today Summary</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="#account" class="nav-item">
+                    <span class="icon">👤</span>
+                    <span>My Account</span>
+                </a>
+                <button class="btn btn-logout" onclick="logout()">
+                    <span class="icon">🚪</span>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="top-header">
+                <div class="header-left">
+                    <h1 id="pageTitle">New Sale</h1>
+                </div>
+                <div class="header-right">
+                    <span id="currentUser">Loading...</span>
+                    <span id="currentTime"></span>
+                </div>
+            </header>
+
+            <!-- Content Sections -->
+            <div class="content-wrapper">
+                <!-- New Sale Section (Active by default) -->
+                <section id="new-sale" class="section active">
+                    <div class="section-content">
+                        <div class="transaction-cards-grid">
+                            <!-- Sales Card -->
+                            <div class="transaction-card" id="saleCard">
+                                <div class="card-header">
+                                    <h3>📊 Record Sale</h3>
+                                    <span class="card-status" id="saleCardStatus">Collapsed</span>
+                                </div>
+
+                                <div class="card-content">
+                                    <!-- Transaction Date & Time -->
+                                    <div class="form-group" style="display: block !important; visibility: visible !important;">
+                                        <label style="display: block;">Sale Date & Time *</label>
+                                        <input type="datetime-local" id="saleTransactionDatetime" required style="display: block !important; width: 100% !important;">
+                                        <small>Use this to backdate sales. Defaults to now.</small>
+                                    </div>
+
+                                    <!-- Search -->
+                                    <div class="form-group">
+                                        <label for="saleProductSearch">Search Product</label>
+                                        <div class="search-wrapper">
+                                            <input type="text" id="saleProductSearch" placeholder="Search by name or code" autocomplete="off">
+                                            <div id="saleProductDropdown" class="dropdown-list"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Product Details (shown after selection) -->
+                                    <div id="saleProductInfo" class="product-info-compact" style="display: none;">
+                                        <div class="info-row">
+                                            <span class="label">Product:</span>
+                                            <span id="saleProductName" class="value"></span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="label">Price:</span>
+                                            <span id="saleProductPrice" class="value"></span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="label">Stock:</span>
+                                            <span id="saleProductStock" class="value"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Quantity Input (shown after selection) -->
+                                    <div id="saleQtySection" class="form-group" style="display: none;">
+                                        <label for="saleQuantity">Quantity</label>
+                                        <div class="qty-input-wrapper">
+                                            <button type="button" class="btn-qty-adjust" onclick="decreaseSaleQty()">−</button>
+                                            <input type="number" id="saleQuantity" min="1" value="1" placeholder="Qty">
+                                            <button type="button" class="btn-qty-adjust" onclick="increaseSaleQty()">+</button>
+                                        </div>
+                                        <div id="saleQtyError" class="error-message" style="display: none;"></div>
+                                    </div>
+
+                                    <!-- Line Total (shown after quantity) -->
+                                    <div id="saleLineTotal" class="line-total-compact" style="display: none;">
+                                        <span>Line Total:</span>
+                                        <span id="saleLineTotalAmount">0.00</span>
+                                    </div>
+
+                                    <!-- Sale Items Table -->
+                                    <div id="saleItemsTable" class="sale-items-table" style="display: none;">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>Product</th>
+                                                    <th>Qty</th>
+                                                    <th>Price</th>
+                                                    <th>Total</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="saleItemsBody">
+                                                <tr class="empty-state">
+                                                    <td colspan="5" class="text-center">No items added</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- Sale Summary -->
+                                    <div id="saleSummary" class="sale-summary-compact" style="display: none;">
+                                        <div class="summary-row">
+                                            <span>Subtotal:</span>
+                                            <span id="saleSaleSubtotal" class="amount">0.00</span>
+                                        </div>
+                                        <div class="summary-row">
+                                            <span>Tax (0%):</span>
+                                            <span id="saleTaxAmount" class="amount">0.00</span>
+                                        </div>
+                                        <div class="summary-row total">
+                                            <span>TOTAL:</span>
+                                            <span id="saleTotalAmount" class="amount">0.00</span>
+                                        </div>
+
+                                        <div class="action-buttons">
+                                            <button type="button" class="btn btn-secondary" onclick="addSaleProduct()">+ Add Another</button>
+                                            <button type="button" class="btn btn-primary" onclick="completeSale()" id="completeSaleBtn" disabled>
+                                                ✓ COMPLETE SALE
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Add Button (when no items) -->
+                                    <div id="saleAddButton" class="action-buttons" style="display: none;">
+                                        <button type="button" class="btn btn-primary btn-block" onclick="addSaleProduct()">
+                                            + Add to Sale
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Purchase Card -->
+                            <div class="transaction-card" id="purchaseCard">
+                                <div class="card-header">
+                                    <h3>📦 Record Purchase</h3>
+                                    <span class="card-status" id="purchaseCardStatus">Collapsed</span>
+                                </div>
+
+                                <div class="card-content">
+                                    <!-- Search -->
+                                    <div class="form-group">
+                                        <label for="purchaseProductSearch">Search Product</label>
+                                        <div class="search-wrapper">
+                                            <input type="text" id="purchaseProductSearch" placeholder="Search by name or code" autocomplete="off">
+                                            <div id="purchaseProductDropdown" class="dropdown-list"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Product Details (shown after selection) -->
+                                    <div id="purchaseProductInfo" class="product-info-compact" style="display: none;">
+                                        <div class="info-row">
+                                            <span class="label">Product:</span>
+                                            <span id="purchaseProductName" class="value"></span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="label">Product:</span>
+                                            <span id="purchaseProductName" class="value"></span>
+                                        </div>
+                                        <div class="info-row">
+                                            <span class="label">Current Stock:</span>
+                                            <span id="purchaseProductStock" class="value"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Purchase Details (shown after selection) -->
+                                    <div id="purchaseDetailsSection" style="display: none;">
+                                        <div class="form-group">
+                                            <label for="purchaseQuantity">Quantity</label>
+                                            <div class="qty-input-wrapper">
+                                                <button type="button" class="btn-qty-adjust" onclick="decreasePurchaseQty()">−</button>
+                                                <input type="number" id="purchaseQuantity" min="1" value="1" placeholder="Qty">
+                                                <button type="button" class="btn-qty-adjust" onclick="increasePurchaseQty()">+</button>
+                                            </div>
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label for="purchaseCostPrice">Cost Price (per unit)</label>
+                                            <input type="number" id="purchaseCostPrice" placeholder="0.00" step="0.01" min="0">
+                                        </div>
+
+                                        <div class="form-group">
+                                            <label for="purchaseSupplier">Supplier</label>
+                                            <input type="text" id="purchaseSupplier" placeholder="Supplier name">
+                                        </div>
+
+                                        <div id="purchaseLineTotal" class="line-total-compact">
+                                            <span>Total Cost:</span>
+                                            <span id="purchaseLineTotalAmount">0.00</span>
+                                        </div>
+
+                                        <div class="action-buttons">
+                                            <button type="button" class="btn btn-secondary" onclick="resetPurchaseForm()">Clear</button>
+                                            <button type="button" class="btn btn-primary" onclick="completePurchase()">
+                                                ✓ RECORD PURCHASE
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Select Product Button (when no selection) -->
+                                    <div id="purchaseSelectButton" class="action-buttons">
+                                        <!-- Will be shown initially -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Search Section -->
+                <section id="search" class="section">
+                    <div class="section-content">
+                        <h2>Product Search</h2>
+                        <div class="search-panel">
+                            <div class="form-group">
+                                <input type="text" id="advancedSearch" placeholder="Search by product name or code...">
+                            </div>
+                            <div id="searchResults" class="search-results"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- My Receipts Section -->
+                <section id="receipts" class="section">
+                    <div class="section-content">
+                        <h2>My Receipts</h2>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Transaction ID</th>
+                                    <th>Time</th>
+                                    <th>Items</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="myReceiptsBody">
+                                <tr class="empty-state">
+                                    <td colspan="4" class="text-center">No receipts yet</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- Today Summary Section -->
+                <section id="summary" class="section">
+                    <div class="section-content">
+                        <h2>Today's Personal Sales Summary</h2>
+                        <div class="summary-stats">
+                            <div class="stat-card">
+                                <span class="stat-label">Total Transactions</span>
+                                <span class="stat-value" id="totalTransactions">0</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-label">Total Revenue</span>
+                                <span class="stat-value" id="totalRevenue">0.00</span>
+                            </div>
+                            <div class="stat-card">
+                                <span class="stat-label">Time Period</span>
+                                <span class="stat-value" id="timePeriod">06:00 - Now</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="receiptModal" class="modal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h2>Receipt Preview</h2>
+                <button type="button" class="modal-close" onclick="closeModal('receiptModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="receiptContent" class="receipt-content"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('receiptModal')">Close</button>
+                <button type="button" class="btn btn-primary" onclick="printReceipt()">Print</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="confirmTitle">Confirm Action</h2>
+                <button type="button" class="modal-close" onclick="closeModal('confirmModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage"></p>
+                <div id="confirmDetails" class="details-box"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('confirmModal')">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Scripts -->
+    <script>
+        // API Configuration
+        window.API_BASE = '/topinv/api';
+    </script>
+    <script src="/topinv/public/js/common.js"></script>
+    <script src="/topinv/public/js/cashier.js"></script>
+</body>
+</html>

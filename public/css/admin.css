@@ -1,0 +1,640 @@
+/* ============================================
+   ADMIN DASHBOARD STYLES
+   ============================================ */
+
+/* ============================================
+   PERIOD STATUS
+   ============================================ */
+.period-status {
+    margin-bottom: 32px;
+}
+
+.status-box {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%);
+    border: 2px solid var(--primary-color);
+    padding: 24px;
+    border-radius: var(--border-radius);
+}
+
+.status-box h3 {
+    font-size: 20px;
+    margin-bottom: 12px;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.status-badge.active {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.status-badge.closed {
+    background-color: #e5e7eb;
+    color: #374151;
+}
+
+.status-info {
+    font-size: 14px;
+    color: var(--text-light);
+    margin-bottom: 16px;
+}
+
+.status-info p {
+    margin-bottom: 8px;
+}
+
+.status-actions {
+    display: flex;
+    gap: 12px;
+}
+
+.status-actions .btn {
+    flex: 1;
+    max-width: 200px;
+}
+
+/* ============================================
+   METRICS SECTION
+   ============================================ */
+.metrics-section {
+    margin-bottom: 32px;
+}
+
+.metrics-section h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: var(--text-dark);
+}
+
+.metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+}
+
+.metric-card {
+    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+    padding: 20px;
+    border-radius: var(--border-radius);
+    border-left: 4px solid var(--primary-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.metric-label {
+    font-size: 13px;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.metric-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 6px;
+}
+
+.metric-change {
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+/* ============================================
+   ALERTS SECTION
+   ============================================ */
+.alerts-section {
+    margin-bottom: 32px;
+}
+
+.alerts-section h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+}
+
+.alerts-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.alert {
+    margin-bottom: 0;
+}
+
+/* ============================================
+   RECENT TRANSACTIONS
+   ============================================ */
+.recent-transactions {
+    margin-top: 32px;
+}
+
+.recent-transactions h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+}
+
+.transactions-table {
+    width: 100%;
+}
+
+/* ============================================
+   PERIOD TIMELINE
+   ============================================ */
+.period-timeline {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.period-card {
+    background-color: var(--light-gray);
+    padding: 20px;
+    border-radius: var(--border-radius);
+    border: 2px solid var(--border-gray);
+    transition: all 0.3s;
+}
+
+.period-card.active {
+    border-color: var(--primary-color);
+    background-color: rgba(37, 99, 235, 0.05);
+}
+
+.period-card h3 {
+    font-size: 18px;
+    margin-bottom: 12px;
+}
+
+.period-card p {
+    font-size: 13px;
+    color: var(--text-light);
+    margin-bottom: 8px;
+}
+
+.period-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.period-actions .btn {
+    flex: 1;
+    font-size: 12px;
+    padding: 8px 12px;
+}
+
+/* ============================================
+   DATA TABLES
+   ============================================ */
+.data-table {
+    width: 100%;
+    margin-top: 16px;
+}
+
+.data-table thead {
+    background-color: var(--light-gray);
+}
+
+.data-table tbody tr {
+    border-bottom: 1px solid var(--border-gray);
+}
+
+.data-table tbody tr:hover {
+    background-color: var(--light-gray);
+}
+
+/* ============================================
+   PRODUCT TABLE
+   ============================================ */
+.products-table {
+    font-size: 13px;
+}
+
+.products-table tbody td {
+    padding: 12px;
+}
+
+.product-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.product-actions .btn {
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+/* ============================================
+   PURCHASES TABLE
+   ============================================ */
+.purchases-table {
+    font-size: 13px;
+}
+
+/* ============================================
+   SALES TABLE
+   ============================================ */
+.sales-table {
+    font-size: 13px;
+}
+
+.sale-status {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.sale-status.completed {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.sale-status.voided {
+    background-color: #fee2e2;
+    color: #7f1d1d;
+}
+
+/* ============================================
+   STOCK TAKING
+   ============================================ */
+.stock-taking-wrapper {
+    margin-top: 20px;
+}
+
+.stock-taking-form {
+    background-color: var(--light-gray);
+    padding: 24px;
+    border-radius: var(--border-radius);
+    border: 1px solid var(--border-gray);
+}
+
+.stock-taking-form .form-group {
+    margin-bottom: 16px;
+}
+
+.progress-info {
+    background-color: var(--light-gray);
+    padding: 12px;
+    border-radius: var(--border-radius);
+    font-size: 14px;
+    margin-bottom: 16px;
+}
+
+.stock-taking-table {
+    width: 100%;
+    margin-top: 16px;
+    font-size: 13px;
+}
+
+.stock-taking-table input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--border-gray);
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.variance-positive {
+    color: var(--success-color);
+    font-weight: 600;
+}
+
+.variance-negative {
+    color: var(--danger-color);
+    font-weight: 600;
+}
+
+/* ============================================
+   AUDIT LOG
+   ============================================ */
+.audit-table {
+    font-size: 12px;
+}
+
+.audit-table tbody td {
+    padding: 10px 12px;
+}
+
+.transaction-id {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    background-color: var(--light-gray);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+/* ============================================
+   FORMS
+   ============================================ */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    font-size: 14px;
+    color: var(--text-dark);
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border-gray);
+    border-radius: var(--border-radius);
+    font-size: 14px;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+/* ============================================
+   RESPONSIVE ADMIN
+   ============================================ */
+@media (max-width: 1400px) {
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .alerts-container {
+        grid-template-columns: 1fr;
+    }
+
+    .period-timeline {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 1024px) {
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .period-timeline {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .period-status {
+        margin-bottom: 20px;
+    }
+
+    .status-box {
+        padding: 16px;
+    }
+
+    .status-box h3 {
+        font-size: 16px;
+    }
+
+    .status-badge {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+    .status-info {
+        font-size: 12px;
+    }
+
+    .status-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .status-actions .btn {
+        width: 100%;
+        max-width: 100%;
+        min-height: 44px;
+    }
+
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    .metric-card {
+        padding: 16px;
+    }
+
+    .metric-label {
+        font-size: 11px;
+    }
+
+    .metric-value {
+        font-size: 24px;
+    }
+
+    .metric-change {
+        font-size: 11px;
+    }
+
+    .alerts-container {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .alerts-container .alert {
+        margin-bottom: 0;
+        padding: 12px;
+        font-size: 12px;
+    }
+
+    .period-timeline {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .timeline-item {
+        padding: 12px;
+    }
+
+    .timeline-item h4 {
+        font-size: 13px;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .data-table {
+        font-size: 12px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .data-table table {
+        min-width: 500px;
+    }
+
+    .data-table thead th {
+        padding: 8px;
+        font-size: 12px;
+    }
+
+    .data-table tbody td {
+        padding: 8px;
+        font-size: 12px;
+    }
+
+    .section-content {
+        padding: 16px;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .section-header h2 {
+        font-size: 18px;
+        margin-bottom: 12px;
+    }
+
+    .section-header .btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .period-status {
+        margin-bottom: 16px;
+    }
+
+    .status-box {
+        padding: 12px;
+    }
+
+    .status-box h3 {
+        font-size: 14px;
+    }
+
+    .status-info {
+        font-size: 11px;
+    }
+
+    .status-info p {
+        margin-bottom: 4px;
+    }
+
+    .status-actions {
+        gap: 8px;
+    }
+
+    .status-actions .btn {
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    .metrics-grid {
+        grid-template-columns: 1fr;
+        gap: 10px;
+    }
+
+    .metric-card {
+        padding: 12px;
+    }
+
+    .metric-label {
+        font-size: 10px;
+    }
+
+    .metric-value {
+        font-size: 20px;
+    }
+
+    .alerts-container .alert {
+        padding: 10px;
+        font-size: 11px;
+    }
+
+    .period-timeline {
+        gap: 10px;
+    }
+
+    .timeline-item {
+        padding: 10px;
+    }
+
+    .timeline-item h4 {
+        font-size: 12px;
+        margin-bottom: 4px;
+    }
+
+    .timeline-item p {
+        font-size: 11px;
+    }
+
+    .form-row {
+        gap: 10px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        padding: 10px;
+        font-size: 14px;
+    }
+
+    .data-table {
+        font-size: 11px;
+    }
+
+    .data-table table {
+        min-width: 100%;
+    }
+
+    .data-table thead th {
+        padding: 6px 4px;
+        font-size: 10px;
+    }
+
+    .data-table tbody td {
+        padding: 6px 4px;
+        font-size: 10px;
+    }
+
+    .action-icons {
+        gap: 2px;
+    }
+
+    .action-icons button {
+        padding: 4px 6px;
+        font-size: 9px;
+    }
+
+    .badge {
+        padding: 3px 6px;
+        font-size: 9px;
+    }
+
+    .section-content {
+        padding: 10px;
+    }
+
+    .section-header h2 {
+        font-size: 16px;
+    }
+}

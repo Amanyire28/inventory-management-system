@@ -1,0 +1,32 @@
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Backup files
+*.bak
+*_backup.*
+admin_backup.html
+
+# Logs
+*.log
+error_log
+
+# Temporary files
+*.tmp
+*.temp
+
+# PHP
+vendor/
+composer.phar
+
+# Database
+*.sql.gz
+*.sql.backup
