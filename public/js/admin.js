@@ -81,6 +81,9 @@ function showSection(sectionName) {
     switch(sectionName) {
         case 'overview':
             loadDashboardMetrics();
+            loadAlerts();
+            loadRecentTransactions();
+            getCurrentPeriod();
             break;
         case 'products':
             console.log('🟢 Loading products table...');
@@ -164,6 +167,147 @@ function updateTodaySummary(data) {
     }
     if (transactionsEl) {
         transactionsEl.textContent = `${data.today.transaction_count || 0} transactions`;
+    }
+}
+
+// ============================================
+// ALERTS & RECENT TRANSACTIONS
+// ============================================
+async function loadAlerts() {
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const response = await fetch(`${API_BASE}/dashboard?action=alerts`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to load alerts');
+        }
+
+        const container = document.getElementById('alertsContainer');
+        if (!container) return;
+
+        const alerts = data.data;
+        
+        // Clear loading message
+        container.innerHTML = '';
+
+        // Check if there are any alerts
+        if (alerts.low_stock.length === 0 && alerts.out_of_stock.length === 0) {
+            container.innerHTML = '<p class="no-alerts">✓ All products are well stocked</p>';
+            return;
+        }
+
+        let html = '';
+
+        // Out of stock alerts (critical)
+        if (alerts.out_of_stock.length > 0) {
+            alerts.out_of_stock.forEach(product => {
+                html += `
+                    <div class="alert alert-critical">
+                        <span class="alert-icon">⚠️</span>
+                        <div class="alert-content">
+                            <strong>${product.product_name}</strong>
+                            <p>OUT OF STOCK - Immediate restock required</p>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Low stock alerts (warning)
+        if (alerts.low_stock.length > 0) {
+            alerts.low_stock.forEach(product => {
+                html += `
+                    <div class="alert alert-warning">
+                        <span class="alert-icon">⚡</span>
+                        <div class="alert-content">
+                            <strong>${product.product_name}</strong>
+                            <p>Low stock: ${product.current_stock} units (Reorder level: ${product.reorder_level})</p>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        container.innerHTML = html;
+        console.log('✓ Alerts loaded:', alerts.out_of_stock.length + alerts.low_stock.length, 'total');
+    } catch (error) {
+        console.error('Failed to load alerts:', error);
+        const container = document.getElementById('alertsContainer');
+        if (container) {
+            container.innerHTML = '<p class="error">Failed to load alerts</p>';
+        }
+    }
+}
+
+async function loadRecentTransactions() {
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const response = await fetch(`${API_BASE}/dashboard?action=recent-transactions&limit=10`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to load transactions');
+        }
+
+        const tbody = document.getElementById('recentTransactionsBody');
+        if (!tbody) return;
+
+        const transactions = data.data;
+
+        // Clear loading message
+        tbody.innerHTML = '';
+
+        if (transactions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="no-data">No recent transactions</td></tr>';
+            return;
+        }
+
+        transactions.forEach(txn => {
+            const row = document.createElement('tr');
+            
+            // Format date/time
+            const date = new Date(txn.transaction_date);
+            const dateStr = date.toLocaleDateString('en-GB');
+            const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            
+            // Type badge
+            const typeBadge = txn.transaction_type === 'sale' 
+                ? '<span class="badge badge-success">Sale</span>'
+                : '<span class="badge badge-info">Purchase</span>';
+            
+            // Format amount
+            const amount = safeNumber(txn.total_amount).toFixed(0);
+            
+            row.innerHTML = `
+                <td>${dateStr}<br><small>${timeStr}</small></td>
+                <td>${typeBadge}</td>
+                <td>${txn.product_name || 'N/A'}</td>
+                <td>${txn.quantity || 0}</td>
+                <td>UGX ${amount}</td>
+                <td>${txn.user_name || 'System'}</td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+
+        console.log('✓ Recent transactions loaded:', transactions.length);
+    } catch (error) {
+        console.error('Failed to load recent transactions:', error);
+        const tbody = document.getElementById('recentTransactionsBody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="6" class="error">Failed to load transactions</td></tr>';
+        }
     }
 }
 
@@ -806,9 +950,26 @@ async function getCurrentPeriod() {
         if (response.ok && data.data) {
             currentPeriod = data.data;
             console.log(`Current period: ${currentPeriod.period_name} (${currentPeriod.status})`);
+            
+            // Update header display
+            const periodNameEl = document.getElementById('currentPeriodName');
+            const periodStatusEl = document.getElementById('currentPeriodStatus');
+            
+            if (periodNameEl) {
+                periodNameEl.textContent = currentPeriod.period_name;
+            }
+            if (periodStatusEl) {
+                periodStatusEl.textContent = currentPeriod.status;
+                periodStatusEl.className = 'badge ' + (currentPeriod.status === 'active' ? 'badge-success' : 'badge-secondary');
+            }
         }
     } catch (error) {
         console.error('Failed to load current period:', error);
+        // Show error state in header
+        const periodNameEl = document.getElementById('currentPeriodName');
+        if (periodNameEl) {
+            periodNameEl.textContent = 'Error loading period';
+        }
     }
 }
 
