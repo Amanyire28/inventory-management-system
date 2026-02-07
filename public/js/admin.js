@@ -2,6 +2,9 @@
    ADMIN DASHBOARD JAVASCRIPT - TOPINV
    ======================================== */
 
+// API Base URL
+const API_BASE = window.API_BASE || '/topinv/api';
+
 // Global state
 let adminProducts = [];
 let adminSales = [];
@@ -14,6 +17,9 @@ let currentReversalSaleId = null;
 // INITIALIZATION
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Admin dashboard initializing...');
+    console.log('🚀 API_BASE:', window.API_BASE);
+    
     // Load dashboard data
     loadDashboardMetrics();
     getCurrentPeriod();
@@ -44,12 +50,16 @@ function initializeDatetimeInputs() {
 // SECTION NAVIGATION
 // ============================================
 function showSection(sectionName) {
+    console.log('🟢 showSection called with:', sectionName);
+    
     // Hide all sections
     const sections = document.querySelectorAll('.section');
     sections.forEach(section => section.classList.remove('active'));
     
     // Show selected section
     const targetSection = document.getElementById(sectionName);
+    console.log('🟢 Target section element:', targetSection);
+    
     if (targetSection) {
         targetSection.classList.add('active');
     }
@@ -67,11 +77,13 @@ function showSection(sectionName) {
     });
     
     // Load section data
+    console.log('🟢 About to load data for section:', sectionName);
     switch(sectionName) {
         case 'overview':
             loadDashboardMetrics();
             break;
         case 'products':
+            console.log('🟢 Loading products table...');
             loadProductsTable();
             break;
         case 'purchases':
@@ -91,7 +103,7 @@ function showSection(sectionName) {
             break;
     }
     
-    console.log(`Showing section: ${sectionName}`);
+    console.log(`✅ Showed section: ${sectionName}`);
 }
 
 // ============================================
@@ -159,6 +171,8 @@ function updateTodaySummary(data) {
 // PRODUCTS / INVENTORY
 // ============================================
 async function loadProductsTable(statusFilter = 'all') {
+    console.log('🔵 loadProductsTable called with filter:', statusFilter);
+    
     try {
         const token = sessionStorage.getItem('authToken');
         if (!token) throw new Error('No auth token');
@@ -167,18 +181,22 @@ async function loadProductsTable(statusFilter = 'all') {
         const url = statusFilter && statusFilter !== 'all' 
             ? `${API_BASE}/products?status=${statusFilter}`
             : `${API_BASE}/products?status=all`;
+        
+        console.log('🔵 Fetching from URL:', url);
             
         const response = await fetch(url, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
         const data = await response.json();
+        console.log('🔵 API Response:', data);
 
         if (!response.ok) {
             throw new Error(data.message || 'Failed to load products');
         }
 
         adminProducts = data.data.products || [];
+        console.log('🔵 Products loaded:', adminProducts.length);
         
         // Apply filter
         let filteredProducts = adminProducts;
@@ -188,8 +206,11 @@ async function loadProductsTable(statusFilter = 'all') {
 
         // Display products
         const tbody = document.getElementById('productsTableBody');
+        console.log('🔵 Table body element:', tbody);
+        
         if (filteredProducts.length === 0) {
             tbody.innerHTML = '<tr><td colspan="8" class="text-center">No products found</td></tr>';
+            console.log('⚠️ No products to display');
             return;
         }
 
@@ -532,7 +553,7 @@ async function loadPurchasesHistory() {
         const token = sessionStorage.getItem('authToken');
         if (!token) throw new Error('No auth token');
 
-        const response = await fetch(`${API_BASE}/purchases`, {
+        const response = await fetch(`${API_BASE}/purchases/history`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -546,24 +567,32 @@ async function loadPurchasesHistory() {
         const tbody = document.getElementById('purchasesTableBody');
         
         if (purchases.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No purchases found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No purchases found</td></tr>';
             return;
         }
 
         tbody.innerHTML = purchases.map(p => `
             <tr>
+                <td>${p.id}</td>
                 <td>${formatDateTime(p.transaction_date || p.created_at)}</td>
                 <td>${p.product_name}</td>
                 <td>${p.quantity}</td>
-                <td>UGX ${parseFloat(p.cost_price).toFixed(0)}</td>
-                <td>UGX ${(parseFloat(p.cost_price) * p.quantity).toFixed(0)}</td>
-                <td>${p.supplier || 'N/A'}</td>
+                <td>UGX ${parseFloat(p.unit_price || 0).toFixed(0)}</td>
+                <td>UGX ${parseFloat(p.total_amount || 0).toFixed(0)}</td>
+                <td><span class="badge badge-${p.status === 'COMMITTED' ? 'success' : 'warning'}">${p.status}</span></td>
+                <td>-</td>
             </tr>
         `).join('');
 
         console.log(`✓ Loaded ${purchases.length} purchases`);
     } catch (error) {
         console.error('Failed to load purchases:', error);
+        
+        // Show error in table
+        const tbody = document.getElementById('purchasesTableBody');
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-center" style="color: red;">Failed to load purchases: ${error.message}</td></tr>`;
+        }
     }
 }
 
