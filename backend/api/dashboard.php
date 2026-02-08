@@ -237,6 +237,13 @@ function getRecentTransactions($db, $user) {
     try {
         $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 20;
         
+        // Get current OPEN period
+        $periodQuery = "SELECT id FROM periods WHERE status = 'OPEN' LIMIT 1";
+        $periodResult = $db->query($periodQuery);
+        $currentPeriod = $periodResult ? $periodResult->fetch_assoc() : null;
+        $periodId = $currentPeriod ? $currentPeriod['id'] : null;
+        
+        // Build query - filter by period if it exists
         $query = "SELECT 
             t.id,
             t.type,
@@ -252,14 +259,23 @@ function getRecentTransactions($db, $user) {
         FROM transactions t
         JOIN products p ON t.product_id = p.id
         JOIN users u ON t.created_by = u.id
-        WHERE t.status = 'COMMITTED'
-        ORDER BY t.transaction_date DESC
-        LIMIT ?";
+        WHERE t.status = 'COMMITTED'";
         
-        $stmt = $db->prepare($query);
-        $stmt->bind_param('i', $limit);
-        $stmt->execute();
-        $result = $stmt->get_result();
+        // Only show transactions from current period
+        if ($periodId) {
+            $query .= " AND t.period_id = " . intval($periodId);
+        } else {
+            // No period - show nothing
+            echo json_encode([
+                'success' => true,
+                'data' => []
+            ]);
+            return;
+        }
+        
+        $query .= " ORDER BY t.transaction_date DESC LIMIT " . intval($limit);
+        
+        $result = $db->query($query);
         
         $transactions = [];
         while ($row = $result->fetch_assoc()) {
