@@ -217,12 +217,12 @@ class PeriodService {
                 if ($periodStockRecord) {
                     $openingStock = $periodStockRecord['opening_stock'];
                     
-                    // Calculate closing stock = opening + purchases - sales + adjustments
+                    // Calculate closing stock = opening + purchases - sales + adjustments + reversals
                     $transactionSum = $db->fetch(
                         "SELECT COALESCE(SUM(
                             CASE 
                                 WHEN type = 'PURCHASE' THEN quantity
-                                WHEN type = 'SALE' THEN quantity
+                                WHEN type = 'SALE' THEN -quantity
                                 WHEN type = 'ADJUSTMENT' THEN quantity
                                 WHEN type = 'REVERSAL' THEN quantity
                                 ELSE 0
