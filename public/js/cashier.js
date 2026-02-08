@@ -2,6 +2,9 @@
    CASHIER DASHBOARD JAVASCRIPT - TOPINV
    ======================================== */
 
+// API Base URL
+const API_BASE = window.API_BASE || '/topinv/api';
+
 // Global state for SALE
 let currentSale = {
     items: [],
@@ -28,6 +31,9 @@ let currentPeriod = null;
 // INITIALIZATION
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Cashier Dashboard Initializing...');
+    console.log('API_BASE:', API_BASE);
+    
     loadProductsFromAPI();
     getCurrentPeriod();
     loadCurrentUser();
@@ -35,6 +41,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initSaleProductSearch();
     initPurchaseProductSearch();
     loadRecentSales();
+    
+    console.log('✅ All initialization functions called');
     
     // Initialize sale transaction datetime to now
     const now = new Date();
@@ -574,6 +582,7 @@ function safeNumber(value, defaultValue = 0) {
 
 async function loadCurrentUser() {
     try {
+        console.log('Loading current user and today stats...');
         const token = sessionStorage.getItem('authToken');
         if (!token) throw new Error('No auth token');
 
@@ -582,6 +591,7 @@ async function loadCurrentUser() {
         });
 
         const data = await response.json();
+        console.log('User summary response:', data);
 
         if (!response.ok) {
             throw new Error(data.message || 'Failed to load user summary');
@@ -591,24 +601,45 @@ async function loadCurrentUser() {
         const userNameEl = document.getElementById('currentUser');
         if (userNameEl) {
             userNameEl.textContent = `${data.data.user.full_name || data.data.user.username}`;
+            console.log('✓ Updated user name');
+        } else {
+            console.error('Element #currentUser not found');
         }
 
         // Update today's summary
-        updateTodaySummary(data.data.today_stats);
+        if (data.data.today_stats) {
+            console.log('Today stats:', data.data.today_stats);
+            updateTodaySummary(data.data.today_stats);
+        } else {
+            console.warn('No today_stats in response');
+        }
     } catch (error) {
         console.error('Failed to load current user:', error);
     }
 }
 
 function updateTodaySummary(todayStats) {
+    console.log('Updating today summary with:', todayStats);
+    
     const revenueEl = document.getElementById('totalRevenue');
     const transactionsEl = document.getElementById('totalTransactions');
     
+    console.log('Elements found - Revenue:', !!revenueEl, 'Transactions:', !!transactionsEl);
+    
     if (revenueEl && todayStats) {
-        revenueEl.textContent = `UGX ${safeNumber(todayStats.sales_revenue).toFixed(0)}`;
+        const revenue = safeNumber(todayStats.sales_revenue).toFixed(0);
+        revenueEl.textContent = `UGX ${revenue}`;
+        console.log('✓ Updated revenue to:', revenue);
+    } else {
+        console.warn('Cannot update revenue:', { hasElement: !!revenueEl, hasStats: !!todayStats });
     }
+    
     if (transactionsEl && todayStats) {
-        transactionsEl.textContent = `${todayStats.transaction_count || 0}`;
+        const count = todayStats.transaction_count || 0;
+        transactionsEl.textContent = `${count}`;
+        console.log('✓ Updated transaction count to:', count);
+    } else {
+        console.warn('Cannot update transactions:', { hasElement: !!transactionsEl, hasStats: !!todayStats });
     }
 }
 
