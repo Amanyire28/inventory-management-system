@@ -184,6 +184,9 @@ function selectSaleProduct(productId) {
     // Calculate line total
     updateSaleLineTotal();
 
+    // Show add button
+    document.getElementById('saleAddButton').style.display = 'flex';
+
     console.log(`Selected product: ${product.name}`);
 }
 
@@ -264,6 +267,7 @@ function addSaleProduct() {
     document.getElementById('saleProductInfo').style.display = 'none';
     document.getElementById('saleQtySection').style.display = 'none';
     document.getElementById('saleLineTotal').style.display = 'none';
+    document.getElementById('saleAddButton').style.display = 'none';
     selectedSaleProduct = null;
 
     // Update display
