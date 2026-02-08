@@ -90,18 +90,19 @@ class ReportService {
     
     /**
      * Stock Valuation Report
-     * Current inventory value and stock levels
+     * Current inventory value and stock levels with movement breakdown
      */
     public static function getStockValuation() {
         $db = Database::getInstance();
         
         $as_of = date('Y-m-d H:i:s');
         
-        // Get all products with current stock
+        // Get all products with current stock and movement breakdown
         $products = $db->fetchAll(
             "SELECT p.id,
                     p.name,
                     p.description,
+                    p.opening_stock,
                     p.current_stock,
                     p.reorder_level,
                     p.selling_price,
@@ -113,6 +114,24 @@ class ReportService {
                      WHERE product_id = p.id 
                        AND type = 'PURCHASE' 
                        AND status = 'COMMITTED') as avg_cost,
+                    -- Total purchases
+                    COALESCE((SELECT SUM(quantity) 
+                     FROM transactions 
+                     WHERE product_id = p.id 
+                       AND type = 'PURCHASE' 
+                       AND status = 'COMMITTED'), 0) as total_purchases,
+                    -- Total sales (absolute value)
+                    COALESCE((SELECT ABS(SUM(quantity)) 
+                     FROM transactions 
+                     WHERE product_id = p.id 
+                       AND type = 'SALE' 
+                       AND status = 'COMMITTED'), 0) as total_sales,
+                    -- Total adjustments (can be positive or negative)
+                    COALESCE((SELECT SUM(quantity) 
+                     FROM transactions 
+                     WHERE product_id = p.id 
+                       AND type = 'ADJUSTMENT' 
+                       AND status = 'COMMITTED'), 0) as total_adjustments,
                     -- Last purchase date
                     (SELECT MAX(transaction_date) 
                      FROM transactions 
@@ -131,12 +150,27 @@ class ReportService {
         $total_value = 0;
         $low_stock_count = 0;
         $out_of_stock_count = 0;
+        $total_opening = 0;
+        $total_purchases = 0;
+        $total_sales = 0;
+        $total_adjustments = 0;
         
         foreach ($products as &$product) {
+            // Verify stock calculation: Opening + Purchases - Sales ± Adjustments = Current
+            $calculated_stock = $product['opening_stock'] + $product['total_purchases'] - $product['total_sales'] + $product['total_adjustments'];
+            $product['calculated_stock'] = $calculated_stock;
+            $product['variance'] = $product['current_stock'] - $calculated_stock;
+            
             $avg_cost = $product['avg_cost'] ?? $product['cost_price'];
             $product['average_cost'] = $avg_cost;
             $product['total_value'] = $product['current_stock'] * $avg_cost;
             $total_value += $product['total_value'];
+            
+            // Aggregate totals for summary
+            $total_opening += $product['opening_stock'];
+            $total_purchases += $product['total_purchases'];
+            $total_sales += $product['total_sales'];
+            $total_adjustments += $product['total_adjustments'];
             
             // Stock status
             if ($product['current_stock'] <= 0) {
@@ -179,14 +213,21 @@ class ReportService {
                 'total_products' => count($products),
                 'out_of_stock' => $out_of_stock_count,
                 'low_stock' => $low_stock_count,
-                'adequate_stock' => count($products) - $out_of_stock_count - $low_stock_count
+                'adequate_stock' => count($products) - $out_of_stock_count - $low_stock_count,
+                'stock_movement' => [
+                    'opening_stock' => $total_opening,
+                    'purchases' => $total_purchases,
+                    'sales' => $total_sales,
+                    'adjustments' => $total_adjustments,
+                    'calculated_closing' => $total_opening + $total_purchases - $total_sales + $total_adjustments
+                ]
             ]
         ];
     }
     
     /**
      * Monthly Period Report
-     * Comprehensive report for entire month/period
+     * Comprehensive report for entire month/period with stock movements
      */
     public static function getPeriodReport($period_id) {
         $db = Database::getInstance();
@@ -200,6 +241,25 @@ class ReportService {
         if (!$period) {
             throw new Exception("Period not found");
         }
+        
+        // Get stock movements per product for this period
+        $productMovements = $db->fetchAll(
+            "SELECT p.id as product_id,
+                    p.name as product_name,
+                    p.opening_stock,
+                    COALESCE(SUM(CASE WHEN t.type = 'PURCHASE' THEN t.quantity ELSE 0 END), 0) as purchases,
+                    COALESCE(ABS(SUM(CASE WHEN t.type = 'SALE' THEN t.quantity ELSE 0 END)), 0) as sales,
+                    COALESCE(SUM(CASE WHEN t.type = 'ADJUSTMENT' THEN t.quantity ELSE 0 END), 0) as adjustments,
+                    p.current_stock as closing_stock
+             FROM products p
+             LEFT JOIN transactions t ON p.id = t.product_id 
+                AND t.period_id = ? 
+                AND t.status = 'COMMITTED'
+             GROUP BY p.id, p.name, p.opening_stock, p.current_stock
+             HAVING purchases > 0 OR sales > 0 OR adjustments != 0
+             ORDER BY p.name ASC",
+            [$period_id]
+        );
         
         // Get all transactions in this period
         $transactions = $db->fetchAll(
@@ -288,6 +348,25 @@ class ReportService {
         $gross_profit = $sales_total - $purchases_total;
         $margin_percent = $sales_total > 0 ? ($gross_profit / $sales_total) * 100 : 0;
         
+        // Calculate aggregate stock movement
+        $period_opening = 0;
+        $period_purchases = 0;
+        $period_sales = 0;
+        $period_adjustments = 0;
+        $period_closing = 0;
+        
+        foreach ($productMovements as &$movement) {
+            $calculated = $movement['opening_stock'] + $movement['purchases'] - $movement['sales'] + $movement['adjustments'];
+            $movement['calculated_closing'] = $calculated;
+            $movement['variance'] = $movement['closing_stock'] - $calculated;
+            
+            $period_opening += $movement['opening_stock'];
+            $period_purchases += $movement['purchases'];
+            $period_sales += $movement['sales'];
+            $period_adjustments += $movement['adjustments'];
+            $period_closing += $movement['closing_stock'];
+        }
+        
         // Sort products by amount (descending)
         uasort($sales_by_product, function($a, $b) {
             return $b['amount'] <=> $a['amount'];
@@ -340,6 +419,17 @@ class ReportService {
             'audit' => [
                 'backdated_entries' => $backdated_count,
                 'total_transactions' => count($transactions)
+            ],
+            
+            'stock_movement' => [
+                'opening_stock' => $period_opening,
+                'purchases' => $period_purchases,
+                'sales' => $period_sales,
+                'adjustments' => $period_adjustments,
+                'calculated_closing' => $period_opening + $period_purchases - $period_sales + $period_adjustments,
+                'actual_closing' => $period_closing,
+                'variance' => $period_closing - ($period_opening + $period_purchases - $period_sales + $period_adjustments),
+                'by_product' => $productMovements
             ]
         ];
     }

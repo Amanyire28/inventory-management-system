@@ -277,6 +277,30 @@ class SalesService {
     }
     
     /**
+     * Get sale transaction details
+     * Returns transaction information for display/reversal confirmation
+     */
+    public static function getSaleTransactions($transaction_id) {
+        $db = Database::getInstance();
+        
+        $transaction = $db->fetch(
+            "SELECT t.*, p.name as product_name, u.full_name as created_by_name 
+             FROM transactions t
+             JOIN products p ON t.product_id = p.id
+             JOIN users u ON t.created_by = u.id
+             WHERE t.id = ? AND t.type = 'SALE'",
+            [$transaction_id]
+        );
+        
+        if (!$transaction) {
+            throw new Exception("Sale transaction not found");
+        }
+        
+        // Return as array for consistency with frontend expectation
+        return [$transaction];
+    }
+    
+    /**
      * Get sales history
      */
     public static function getSalesHistory($period_id = null, $limit = 100) {

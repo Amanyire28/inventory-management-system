@@ -119,7 +119,6 @@ $router->add('POST', '/products', function() {
         
         $product_id = ProductService::createProduct(
             $body['name'] ?? '',
-            $body['code'] ?? '',
             $body['selling_price'] ?? 0,
             $body['cost_price'] ?? 0,
             $body['opening_stock'] ?? 0,
@@ -244,6 +243,17 @@ $router->add('GET', '/sales/history', function() {
         
         $sales = SalesService::getSalesHistory($period_id);
         Response::success(['sales' => $sales]);
+    } catch (Exception $e) {
+        Response::error($e->getMessage());
+    }
+});
+
+$router->add('GET', '/sales/:id/transactions', function() {
+    try {
+        $transaction_id = Router::getIdFromPath();
+        
+        $transactions = SalesService::getSaleTransactions($transaction_id);
+        Response::success(['transactions' => $transactions]);
     } catch (Exception $e) {
         Response::error($e->getMessage());
     }

@@ -38,6 +38,24 @@ CREATE TABLE IF NOT EXISTS periods (
     closed_by INT,
     INDEX idx_status (status),
     INDEX idx_date_range (start_date, end_date),
+    FOREIGN KEY (closed_by) REFERENCES users(id)
+) ENGINE=MyISAM;
+
+-- 2B. PERIOD PRODUCT OPENING STOCK (Track opening/closing per period)
+-- ====================================================
+CREATE TABLE IF NOT EXISTS period_product_opening_stock (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    period_id INT NOT NULL,
+    product_id INT NOT NULL,
+    opening_stock INT NOT NULL DEFAULT 0,
+    closing_stock INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_period_product (period_id, product_id),
+    FOREIGN KEY (period_id) REFERENCES periods(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    INDEX idx_period (period_id),
+    INDEX idx_product (product_id)
+) ENGINE=MyISAM;
     FOREIGN KEY (closed_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

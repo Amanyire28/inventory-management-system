@@ -12,6 +12,7 @@ let currentSaleTransactions = [];
 let currentPeriod = null;
 let availablePeriods = [];
 let currentReversalSaleId = null;
+let dashboardRefreshInterval = null;
 
 // ============================================
 // INITIALIZATION
@@ -30,8 +31,55 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize datetime inputs to now
     initializeDatetimeInputs();
     
+    // Set up auto-refresh for dashboard (every 30 seconds)
+    startDashboardAutoRefresh();
+    
     console.log('✓ Admin dashboard initialized');
 });
+
+function startDashboardAutoRefresh() {
+    // Clear any existing interval
+    if (dashboardRefreshInterval) {
+        clearInterval(dashboardRefreshInterval);
+    }
+    
+    // Refresh dashboard every 30 seconds if on overview section
+    dashboardRefreshInterval = setInterval(() => {
+        const overviewSection = document.getElementById('overview');
+        if (overviewSection && overviewSection.classList.contains('active')) {
+            console.log('🔄 Auto-refreshing dashboard...');
+            loadDashboardMetrics();
+            loadAlerts();
+            loadRecentTransactions();
+        }
+    }, 30000); // 30 seconds
+}
+
+function stopDashboardAutoRefresh() {
+    if (dashboardRefreshInterval) {
+        clearInterval(dashboardRefreshInterval);
+        dashboardRefreshInterval = null;
+    }
+}
+
+function refreshDashboard() {
+    console.log('🔄 Manual refresh triggered');
+    loadDashboardMetrics();
+    loadAlerts();
+    loadRecentTransactions();
+    
+    // Show feedback
+    const btn = event?.target;
+    if (btn) {
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Refreshed!';
+        btn.disabled = true;
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }, 2000);
+    }
+}
 
 function initializeDatetimeInputs() {
     const now = new Date();
@@ -95,6 +143,9 @@ function showSection(sectionName) {
         case 'sales':
             loadSalesTable();
             break;
+        case 'stock-taking':
+            loadAdjustments();
+            break;
         case 'periods':
             loadPeriodsTable();
             break;
@@ -117,7 +168,7 @@ async function loadDashboardMetrics() {
         const token = sessionStorage.getItem('authToken');
         if (!token) throw new Error('No auth token');
 
-        const response = await fetch(`${API_BASE}/dashboard?action=summary`, {
+        const response = await fetch(`${API_BASE}/dashboard?action=metrics`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
@@ -127,27 +178,58 @@ async function loadDashboardMetrics() {
             throw new Error(data.message || 'Failed to load dashboard metrics');
         }
 
-        // Update metrics (safely check if elements exist)
-        const totalProductsEl = document.getElementById('dashTotalProducts');
-        const todaySalesEl = document.getElementById('todayRevenue');
+        const metrics = data.data;
+        
+        // Update Today's Summary - Revenue
+        const todayRevenueEl = document.getElementById('todayRevenue');
+        const todayTransactionsEl = document.getElementById('todayTransactions');
+        if (todayRevenueEl) {
+            todayRevenueEl.textContent = `UGX ${safeNumber(metrics.sales.revenue).toFixed(0)}`;
+        }
+        if (todayTransactionsEl) {
+            todayTransactionsEl.textContent = `${metrics.sales.transaction_count || 0} transactions`;
+        }
+        
+        // Update Today's Summary - Purchases
         const todayPurchasesEl = document.getElementById('todayPurchases');
-        const lowStockEl = document.getElementById('dashLowStock');
-        
-        if (totalProductsEl) {
-            totalProductsEl.textContent = data.data.total_products || 0;
-        }
-        if (todaySalesEl) {
-            todaySalesEl.textContent = 'UGX ' + (data.data.today_sales || 0).toFixed(0);
-        }
+        const todayPurchasesCountEl = document.getElementById('todayPurchasesCount');
         if (todayPurchasesEl) {
-            todayPurchasesEl.textContent = 'UGX ' + (data.data.today_purchases || 0).toFixed(0);
+            todayPurchasesEl.textContent = `UGX ${safeNumber(metrics.purchases.amount).toFixed(0)}`;
         }
-        if (lowStockEl) {
-            lowStockEl.textContent = data.data.low_stock_count || 0;
+        if (todayPurchasesCountEl) {
+            todayPurchasesCountEl.textContent = `${metrics.purchases.purchase_count || 0} purchases`;
         }
         
-        // Update today's summary
-        updateTodaySummary(data.data);
+        // Update Key Metrics Cards
+        const salesRevenueEl = document.getElementById('metricSalesRevenue');
+        const salesCountEl = document.getElementById('metricSalesCount');
+        if (salesRevenueEl) {
+            salesRevenueEl.textContent = `UGX ${safeNumber(metrics.sales.revenue).toFixed(0)}`;
+        }
+        if (salesCountEl) {
+            salesCountEl.textContent = `${metrics.sales.transaction_count} sales today`;
+        }
+        
+        const purchasesAmountEl = document.getElementById('metricPurchasesAmount');
+        const purchasesCountEl = document.getElementById('metricPurchasesCount');
+        if (purchasesAmountEl) {
+            purchasesAmountEl.textContent = `UGX ${safeNumber(metrics.purchases.amount).toFixed(0)}`;
+        }
+        if (purchasesCountEl) {
+            purchasesCountEl.textContent = `${metrics.purchases.purchase_count} purchases today`;
+        }
+        
+        const voidedUnitsEl = document.getElementById('metricVoidedUnits');
+        const voidedCountEl = document.getElementById('metricVoidedCount');
+        if (voidedUnitsEl) {
+            voidedUnitsEl.textContent = metrics.voids.units || 0;
+        }
+        if (voidedCountEl) {
+            voidedCountEl.textContent = `${metrics.voids.void_count} voids`;
+        }
+        
+        // Load product count and low stock count separately
+        await loadProductMetrics(token);
 
         console.log('✓ Dashboard metrics loaded');
     } catch (error) {
@@ -155,18 +237,29 @@ async function loadDashboardMetrics() {
     }
 }
 
-function updateTodaySummary(data) {
-    if (!data.today) return;
-    
-    // Update today's revenue in the overview section
-    const revenueEl = document.getElementById('todayRevenue');
-    const transactionsEl = document.getElementById('todayTransactions');
-    
-    if (revenueEl) {
-        revenueEl.textContent = `UGX ${safeNumber(data.today.revenue).toFixed(0)}`;
-    }
-    if (transactionsEl) {
-        transactionsEl.textContent = `${data.today.transaction_count || 0} transactions`;
+async function loadProductMetrics(token) {
+    try {
+        // Get low stock count from alerts
+        const alertsResponse = await fetch(`${API_BASE}/dashboard?action=alerts`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        const alertsData = await alertsResponse.json();
+        
+        if (alertsResponse.ok && alertsData.data) {
+            const lowStockCount = alertsData.data.low_stock.length + alertsData.data.out_of_stock.length;
+            const lowStockEl = document.getElementById('metricLowStock');
+            const lowStockTextEl = document.getElementById('metricLowStockText');
+            
+            if (lowStockEl) {
+                lowStockEl.textContent = lowStockCount;
+            }
+            if (lowStockTextEl) {
+                lowStockTextEl.textContent = lowStockCount === 1 ? '1 item needs attention' : `${lowStockCount} items need attention`;
+            }
+        }
+    } catch (error) {
+        console.error('Failed to load product metrics:', error);
     }
 }
 
@@ -281,21 +374,35 @@ async function loadRecentTransactions() {
             const dateStr = date.toLocaleDateString('en-GB');
             const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
             
-            // Type badge
-            const typeBadge = txn.transaction_type === 'sale' 
-                ? '<span class="badge badge-success">Sale</span>'
-                : '<span class="badge badge-info">Purchase</span>';
+            // Type badge - normalize type to uppercase for comparison
+            const txnType = (txn.type || txn.transaction_type || '').toUpperCase();
+            let typeBadge = '';
+            
+            if (txnType === 'SALE') {
+                typeBadge = '<span class="badge badge-success">Sale</span>';
+            } else if (txnType === 'PURCHASE') {
+                typeBadge = '<span class="badge badge-info">Purchase</span>';
+            } else if (txnType === 'VOID' || txnType === 'REVERSAL') {
+                typeBadge = '<span class="badge badge-warning">Void</span>';
+            } else if (txnType === 'ADJUSTMENT') {
+                typeBadge = '<span class="badge badge-secondary">Adjustment</span>';
+            } else {
+                typeBadge = `<span class="badge">${txnType}</span>`;
+            }
             
             // Format amount
             const amount = safeNumber(txn.total_amount).toFixed(0);
+            
+            // Get user name
+            const userName = txn.created_by || txn.user_name || 'System';
             
             row.innerHTML = `
                 <td>${dateStr}<br><small>${timeStr}</small></td>
                 <td>${typeBadge}</td>
                 <td>${txn.product_name || 'N/A'}</td>
-                <td>${txn.quantity || 0}</td>
+                <td>${Math.abs(txn.quantity || 0)}</td>
                 <td>UGX ${amount}</td>
-                <td>${txn.user_name || 'System'}</td>
+                <td>${userName}</td>
             `;
             
             tbody.appendChild(row);
@@ -361,7 +468,6 @@ async function loadProductsTable(statusFilter = 'all') {
         tbody.innerHTML = filteredProducts.map(p => `
             <tr>
                 <td>${p.name}</td>
-                <td>${p.code || '-'}</td>
                 <td>${p.current_stock}</td>
                 <td>${p.reorder_level || '-'}</td>
                 <td>UGX ${parseFloat(p.selling_price).toFixed(0)}</td>
@@ -390,9 +496,114 @@ async function loadProductsTable(statusFilter = 'all') {
     }
 }
 
-function filterProducts() {
-    const statusFilter = document.getElementById('productStatusFilter').value;
-    loadProductsTable(statusFilter);
+// Debounce function for search
+let searchDebounceTimer;
+function debounce(func, delay) {
+    return function(...args) {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => func.apply(this, args), delay);
+    };
+}
+
+// Async product search with debouncing
+async function filterProducts() {
+    const searchInput = document.getElementById('productSearch');
+    const searchTerm = searchInput.value.trim();
+    
+    // If search is empty, load all products
+    if (searchTerm.length === 0) {
+        hideSearchResults();
+        loadProductsTable();
+        return;
+    }
+    
+    // Show search results dropdown
+    await searchProductsAsync(searchTerm);
+}
+
+// Debounced version
+const debouncedFilterProducts = debounce(filterProducts, 300);
+
+async function searchProductsAsync(searchTerm) {
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const url = `${API_BASE}/products?action=search&q=${encodeURIComponent(searchTerm)}&limit=5`;
+        
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to search products');
+        }
+
+        const products = data.data || [];
+        displaySearchResults(products);
+        
+    } catch (error) {
+        console.error('Failed to search products:', error);
+    }
+}
+
+function displaySearchResults(products) {
+    let resultsContainer = document.getElementById('productSearchResults');
+    
+    // Create results container if it doesn't exist
+    if (!resultsContainer) {
+        resultsContainer = document.createElement('div');
+        resultsContainer.id = 'productSearchResults';
+        resultsContainer.className = 'search-results-dropdown';
+        
+        const searchInput = document.getElementById('productSearch');
+        searchInput.parentNode.style.position = 'relative';
+        searchInput.parentNode.appendChild(resultsContainer);
+    }
+    
+    // Clear previous results
+    resultsContainer.innerHTML = '';
+    
+    if (products.length === 0) {
+        resultsContainer.innerHTML = '<div class="search-result-item no-results">No products found</div>';
+        resultsContainer.style.display = 'block';
+        return;
+    }
+    
+    // Display up to 5 products
+    products.forEach(product => {
+        const item = document.createElement('div');
+        item.className = 'search-result-item';
+        item.innerHTML = `
+            <div class="result-name">${product.name}</div>
+            <div class="result-details">
+                <span>Stock: ${product.current_stock}</span>
+                <span>Price: UGX ${parseFloat(product.selling_price).toFixed(0)}</span>
+            </div>
+        `;
+        item.onclick = () => selectSearchResult(product);
+        resultsContainer.appendChild(item);
+    });
+    
+    resultsContainer.style.display = 'block';
+}
+
+function selectSearchResult(product) {
+    // You can customize this action - for now, it will load the full table filtered
+    document.getElementById('productSearch').value = product.name;
+    hideSearchResults();
+    
+    // Load full products table with this product highlighted
+    loadProductsTable();
+}
+
+function hideSearchResults() {
+    const resultsContainer = document.getElementById('productSearchResults');
+    if (resultsContainer) {
+        resultsContainer.style.display = 'none';
+    }
 }
 
 function searchProducts() {
@@ -414,22 +625,20 @@ function searchProducts() {
     // Search filter
     if (searchTerm) {
         filtered = filtered.filter(p => 
-            p.name.toLowerCase().includes(searchTerm) || 
-            (p.code && p.code.toLowerCase().includes(searchTerm))
+            p.name.toLowerCase().includes(searchTerm)
         );
     }
     
     // Display filtered products
     const tbody = document.getElementById('productsTableBody');
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center">No products found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center">No products found</td></tr>';
         return;
     }
 
     tbody.innerHTML = filtered.map(p => `
         <tr>
             <td>${p.name}</td>
-            <td>${p.code || '-'}</td>
             <td>${p.current_stock}</td>
             <td>${p.reorder_level || '-'}</td>
             <td>UGX ${parseFloat(p.selling_price).toFixed(0)}</td>
@@ -451,6 +660,11 @@ function openProductForm(productId = null) {
     const title = document.getElementById('productFormTitle');
     const form = document.getElementById('productForm');
     
+    if (!form) {
+        console.error('Product form not found');
+        return;
+    }
+    
     // Reset form
     form.reset();
     document.getElementById('productId').value = '';
@@ -463,14 +677,16 @@ function openProductForm(productId = null) {
         title.textContent = 'Edit Product';
         document.getElementById('productId').value = product.id;
         document.getElementById('productName').value = product.name;
-        document.getElementById('productCode').value = product.code || '';
         document.getElementById('productCostPrice').value = product.cost_price;
         document.getElementById('productSellingPrice').value = product.selling_price;
-        document.getElementById('productMinStock').value = product.min_stock_level || '';
+        document.getElementById('productOpeningStock').value = product.opening_stock || 0;
+        document.getElementById('productOpeningStock').disabled = true;
+        document.getElementById('productMinStock').value = product.reorder_level || '';
         document.getElementById('productStatus').value = product.status;
     } else {
         // Add mode
         title.textContent = 'Add New Product';
+        document.getElementById('productOpeningStock').disabled = false;
         document.getElementById('productStatus').value = 'active';
     }
     
@@ -485,12 +701,20 @@ async function saveProduct() {
         const productId = document.getElementById('productId').value;
         const productData = {
             name: document.getElementById('productName').value.trim(),
-            code: document.getElementById('productCode').value.trim(),
             cost_price: parseFloat(document.getElementById('productCostPrice').value),
             selling_price: parseFloat(document.getElementById('productSellingPrice').value),
-            min_stock_level: parseInt(document.getElementById('productMinStock').value) || 0,
-            status: document.getElementById('productStatus').value
+            reorder_level: parseInt(document.getElementById('productMinStock').value) || 10
         };
+        
+        // Only include opening_stock when creating new product
+        if (!productId) {
+            productData.opening_stock = parseInt(document.getElementById('productOpeningStock').value) || 0;
+        }
+        
+        // Add status only if updating
+        if (productId) {
+            productData.status = document.getElementById('productStatus').value;
+        }
         
         // Validation
         if (!productData.name) {
@@ -608,23 +832,281 @@ async function activateProduct(productId) {
 }
 
 // ============================================
+// IMPORT PRODUCTS
+// ============================================
+let importedProductsData = [];
+
+function downloadCSVTemplate() {
+    const csvContent = `name,opening_stock,selling_price,cost_price,reorder_level
+Coca Cola 500ml,100,2000,1500,20
+Fanta Orange 500ml,80,2000,1500,20
+Sprite 500ml,50,2000,1500,15`;
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'product_import_template.csv');
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function openImportProductsModal() {
+    // Reset file input and preview
+    document.getElementById('importFileInput').value = '';
+    document.getElementById('importPreview').style.display = 'none';
+    document.getElementById('importProductsBtn').disabled = true;
+    importedProductsData = [];
+    
+    // Set up file change listener
+    const fileInput = document.getElementById('importFileInput');
+    fileInput.onchange = handleImportFileChange;
+    
+    openModal('importProductsModal');
+}
+
+function handleImportFileChange(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        parseCSV(text);
+    };
+    reader.readAsText(file);
+}
+
+function parseCSV(text) {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length < 2) {
+        alert('CSV file must have at least a header row and one data row');
+        return;
+    }
+    
+    // Parse header
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    
+    // Validate required columns
+    const requiredColumns = ['name', 'opening_stock', 'selling_price', 'cost_price'];
+    const missingColumns = requiredColumns.filter(col => !headers.includes(col));
+    
+    if (missingColumns.length > 0) {
+        alert(`Missing required columns: ${missingColumns.join(', ')}\n\nRequired columns: name, opening_stock, selling_price, cost_price\nOptional: reorder_level`);
+        return;
+    }
+    
+    // Parse data rows
+    importedProductsData = [];
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        if (values.length !== headers.length) continue;
+        
+        const row = {};
+        headers.forEach((header, index) => {
+            row[header] = values[index];
+        });
+        
+        // Validate and convert data types
+        if (!row.name || !row.opening_stock || !row.selling_price || !row.cost_price) {
+            console.warn(`Skipping row ${i + 1}: Missing required fields`);
+            continue;
+        }
+        
+        importedProductsData.push({
+            name: row.name,
+            opening_stock: parseInt(row.opening_stock) || 0,
+            selling_price: parseFloat(row.selling_price) || 0,
+            cost_price: parseFloat(row.cost_price) || 0,
+            reorder_level: parseInt(row.reorder_level) || 10
+        });
+    }
+    
+    if (importedProductsData.length === 0) {
+        alert('No valid product rows found in CSV file');
+        return;
+    }
+    
+    // Show preview
+    displayImportPreview();
+    document.getElementById('importProductsBtn').disabled = false;
+}
+
+function displayImportPreview() {
+    const preview = document.getElementById('importPreview');
+    const thead = document.getElementById('importPreviewHeader');
+    const tbody = document.getElementById('importPreviewBody');
+    const stats = document.getElementById('importStats');
+    
+    // Show preview section
+    preview.style.display = 'block';
+    
+    // Create table header
+    thead.innerHTML = `
+        <tr>
+            <th>Name</th>
+            <th>Opening Stock</th>
+            <th>Selling Price</th>
+            <th>Cost Price</th>
+            <th>Reorder Level</th>
+        </tr>
+    `;
+    
+    // Show first 5 rows
+    const previewRows = importedProductsData.slice(0, 5);
+    tbody.innerHTML = previewRows.map(p => `
+        <tr>
+            <td>${p.name}</td>
+            <td>${p.opening_stock}</td>
+            <td>UGX ${p.selling_price.toFixed(0)}</td>
+            <td>UGX ${p.cost_price.toFixed(0)}</td>
+            <td>${p.reorder_level}</td>
+        </tr>
+    `).join('');
+    
+    // Show stats
+    stats.textContent = `Total products to import: ${importedProductsData.length}`;
+}
+
+async function processImportProducts() {
+    if (importedProductsData.length === 0) {
+        alert('No products to import');
+        return;
+    }
+    
+    if (!confirm(`Import ${importedProductsData.length} products? This may take a moment.`)) {
+        return;
+    }
+    
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+        
+        const importBtn = document.getElementById('importProductsBtn');
+        importBtn.disabled = true;
+        importBtn.textContent = 'Importing...';
+        
+        let successCount = 0;
+        let errorCount = 0;
+        const errors = [];
+        
+        // Import products one by one
+        for (let i = 0; i < importedProductsData.length; i++) {
+            const product = importedProductsData[i];
+            
+            try {
+                // Create product with opening stock
+                const createResponse = await fetch(`${API_BASE}/products`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: product.name,
+                        selling_price: product.selling_price,
+                        cost_price: product.cost_price,
+                        opening_stock: product.opening_stock,
+                        reorder_level: product.reorder_level
+                    })
+                });
+                
+                const createData = await createResponse.json();
+                
+                if (!createResponse.ok) {
+                    throw new Error(createData.message || 'Failed to create product');
+                }
+                
+                successCount++;
+                successCount++;
+            } catch (error) {
+                errorCount++;
+                errors.push(`${product.name}: ${error.message}`);
+                console.error(`Failed to import product ${product.name}:`, error);
+            }
+        }
+        
+        // Show results
+        let message = `Import completed!\n\nSuccessful: ${successCount}\nFailed: ${errorCount}`;
+        if (errors.length > 0 && errors.length <= 10) {
+            message += '\n\nErrors:\n' + errors.join('\n');
+        } else if (errors.length > 10) {
+            message += '\n\nErrors (first 10):\n' + errors.slice(0, 10).join('\n');
+        }
+        
+        alert(message);
+        
+        // Close modal and refresh
+        closeModal('importProductsModal');
+        loadProductsTable();
+        loadDashboardMetrics();
+        
+    } catch (error) {
+        console.error('Import failed:', error);
+        alert('Import failed: ' + error.message);
+        
+        const importBtn = document.getElementById('importProductsBtn');
+        importBtn.disabled = false;
+        importBtn.textContent = 'Import Products';
+    }
+}
+
+// ============================================
 // PURCHASES
 // ============================================
-function openRecordPurchaseForm() {
+async function openRecordPurchaseForm() {
+    // Load products if not already loaded
+    if (!adminProducts || adminProducts.length === 0) {
+        await loadProductsForDropdown();
+    }
+    
     // Reset form
-    document.getElementById('recordPurchaseForm').reset();
+    const form = document.getElementById('recordPurchaseForm');
+    if (form) {
+        form.reset();
+    }
     
     // Populate products dropdown
     const select = document.getElementById('purchaseProductId');
-    select.innerHTML = '<option value="">-- Select Product --</option>' +
-        adminProducts.filter(p => p.status === 'active').map(p => 
-            `<option value="${p.id}">${p.name} (${p.code || 'No code'})</option>`
-        ).join('');
+    if (select) {
+        select.innerHTML = '<option value="">-- Select Product --</option>' +
+            adminProducts.filter(p => p.status === 'active').map(p => 
+                `<option value="${p.id}">${p.name}</option>`
+            ).join('');
+    }
     
     // Initialize datetime to now
     initializeDatetimeInputs();
     
     openModal('recordPurchaseModal');
+}
+
+async function loadProductsForDropdown() {
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const url = `${API_BASE}/products?status=all`;
+            
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to load products');
+        }
+
+        adminProducts = data.data.products || [];
+    } catch (error) {
+        console.error('Failed to load products for dropdown:', error);
+        alert('Failed to load products: ' + error.message);
+    }
 }
 
 async function savePurchase() {
@@ -807,7 +1289,7 @@ async function reverseSale(saleId) {
         const token = sessionStorage.getItem('authToken');
         if (!token) throw new Error('No auth token');
         
-        // Load sale transactions
+        // Load sale transaction details
         const response = await fetch(`${API_BASE}/sales/${saleId}/transactions`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -818,21 +1300,31 @@ async function reverseSale(saleId) {
             throw new Error(data.message || 'Failed to load sale transactions');
         }
         
-        currentSaleTransactions = data.data.transactions || [];
+        const transactions = data.data.transactions || [];
+        if (transactions.length === 0) {
+            throw new Error('No transactions found');
+        }
+        
         currentReversalSaleId = saleId;
+        const transaction = transactions[0];
         
-        // Display transactions in modal
-        const tbody = document.getElementById('reversalTransactionsBody');
-        tbody.innerHTML = currentSaleTransactions.map(t => `
-            <tr>
-                <td>${t.product_name}</td>
-                <td>${t.quantity}</td>
-                <td>UGX ${parseFloat(t.unit_price).toFixed(0)}</td>
-                <td>UGX ${(parseFloat(t.unit_price) * t.quantity).toFixed(0)}</td>
-            </tr>
-        `).join('');
+        // Display transaction info in modal
+        const infoDiv = document.getElementById('reverseSaleInfo');
+        infoDiv.innerHTML = `
+            <div style="border-left: 4px solid #fd7e14; padding: 10px;">
+                <p><strong>Product:</strong> ${transaction.product_name}</p>
+                <p><strong>Quantity:</strong> ${transaction.quantity} units</p>
+                <p><strong>Unit Price:</strong> UGX ${parseFloat(transaction.unit_price).toFixed(0)}</p>
+                <p><strong>Total Amount:</strong> UGX ${(parseFloat(transaction.unit_price) * transaction.quantity).toFixed(0)}</p>
+                <p><strong>Date:</strong> ${transaction.transaction_date}</p>
+                <p><strong>Recorded By:</strong> ${transaction.created_by_name}</p>
+            </div>
+        `;
         
-        openModal('reversalModal');
+        // Clear previous reason
+        document.getElementById('reversalReason').value = '';
+        
+        openModal('reverseSaleModal');
     } catch (error) {
         console.error('Failed to load sale details:', error);
         alert('Failed to load sale details: ' + error.message);
@@ -874,15 +1366,15 @@ async function confirmReverseSale() {
         }
         
         alert('Sale reversed successfully!');
-        closeModal('reversalModal');
+        closeModal('reverseSaleModal');
         loadSalesTable();
         loadProductsTable();
         loadDashboardMetrics();
         
         // Reset
         currentReversalSaleId = null;
-        currentSaleTransactions = [];
         document.getElementById('reversalReason').value = '';
+        document.getElementById('reverseSaleInfo').innerHTML = '';
     } catch (error) {
         console.error('Failed to reverse sale:', error);
         alert('Failed to reverse sale: ' + error.message);
@@ -923,10 +1415,11 @@ async function loadPeriodsTable() {
                 <td>${p.start_date || 'N/A'}</td>
                 <td>${p.end_date || 'Ongoing'}</td>
                 <td><span class="badge badge-${p.status === 'OPEN' ? 'active' : 'closed'}">${p.status}</span></td>
+                <td>${formatDateTime(p.created_at) || 'N/A'}</td>
                 <td>
                     ${p.status === 'OPEN' ? 
                         `<button class="btn btn-sm btn-warning" onclick="closePeriod(${p.id})">Close</button>` : 
-                        '-'
+                        `<button class="btn btn-sm btn-info" onclick="openPeriodPreview(${p.id})">📊 Preview</button>`
                     }
                 </td>
             </tr>
@@ -973,6 +1466,412 @@ async function getCurrentPeriod() {
             periodNameEl.textContent = 'Error loading period';
         }
     }
+}
+
+async function openNewPeriodForm() {
+    try {
+        const periodName = prompt('Enter period name (e.g., January 2024):');
+        if (!periodName || periodName.trim() === '') {
+            return;
+        }
+
+        const startDate = prompt('Enter start date (YYYY-MM-DD):');
+        if (!startDate || startDate.trim() === '') {
+            return;
+        }
+
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const response = await fetch(`${API_BASE}/periods`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                period_name: periodName.trim(),
+                start_date: startDate.trim()
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to create period');
+        }
+
+        alert(`✓ Period "${periodName}" created successfully!`);
+        await loadPeriodsTable();
+        console.log('✓ New period created');
+    } catch (error) {
+        console.error('Failed to create period:', error);
+        alert('Failed to create period: ' + error.message);
+    }
+}
+
+async function closePeriod(periodId) {
+    try {
+        if (!confirm('Are you sure you want to close this period? This action cannot be undone.')) {
+            return;
+        }
+
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const response = await fetch(`${API_BASE}/periods/${periodId}/close`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to close period');
+        }
+
+        alert('✓ Period closed successfully!');
+        await loadPeriodsTable();
+        await getCurrentPeriod();
+        console.log('✓ Period closed');
+    } catch (error) {
+        console.error('Failed to close period:', error);
+        alert('Failed to close period: ' + error.message);
+    }
+}
+
+async function openPeriodPreview(periodId) {
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const response = await fetch(`${API_BASE}/periods/${periodId}/summary`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to load period preview');
+        }
+
+        const summary = data.data || data;
+        const period = summary.period;
+        const txSummary = summary.transaction_summary || {};
+        const products = summary.products || [];
+
+        // Populate modal header
+        document.getElementById('previewPeriodName').textContent = period.period_name;
+        
+        // Period info
+        const statusEl = document.getElementById('previewPeriodStatus');
+        statusEl.innerHTML = `<span class="badge badge-${period.status === 'OPEN' ? 'active' : 'closed'}">${period.status}</span>`;
+        document.getElementById('previewStartDate').textContent = period.start_date || 'N/A';
+        document.getElementById('previewEndDate').textContent = 
+            (period.end_date && period.end_date !== '0000-00-00') ? period.end_date : 'Ongoing';
+        document.getElementById('previewCreatedAt').textContent = formatDateTime(period.created_at);
+
+        // Transaction summary
+        document.getElementById('previewTotalTransactions').textContent = safeNumber(txSummary.total_transactions, 0);
+        document.getElementById('previewTotalSales').textContent = 
+            `UGX ${safeNumber(txSummary.total_sales_amount).toFixed(0).toLocaleString()}`;
+        document.getElementById('previewTotalPurchases').textContent = 
+            `UGX ${safeNumber(txSummary.total_purchases_amount).toFixed(0).toLocaleString()}`;
+        document.getElementById('previewTotalAdjustments').textContent = 
+            `${safeNumber(txSummary.total_adjustments_qty, 0)} units`;
+        document.getElementById('previewReversalCount').textContent = 
+            safeNumber(txSummary.reversal_count, 0);
+
+        // Product details
+        const tbody = document.getElementById('previewProductsBody');
+        if (products.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No products in this period</td></tr>';
+        } else {
+            tbody.innerHTML = products.map(p => {
+                const openingStock = safeNumber(p.opening_stock, 0);
+                const purchases = safeNumber(p.purchases, 0);
+                const sales = safeNumber(p.sales, 0);
+                const adjustments = safeNumber(p.adjustments, 0);
+                const calculatedClosing = openingStock + purchases - sales + adjustments;
+                const actualClosing = safeNumber(p.closing_stock, 0);
+                const costValue = actualClosing * safeNumber(p.cost_price, 0);
+                const variance = calculatedClosing - actualClosing;
+
+                return `
+                    <tr ${variance !== 0 ? 'style="background: #fff3cd;"' : ''}>
+                        <td><strong>${p.product_name}</strong></td>
+                        <td style="text-align: center;">${openingStock}</td>
+                        <td style="text-align: center; color: green;">+${purchases}</td>
+                        <td style="text-align: center; color: red;">-${sales}</td>
+                        <td style="text-align: center; color: orange;">${adjustments > 0 ? '+' : ''}${adjustments}</td>
+                        <td style="text-align: center; font-weight: bold;">${calculatedClosing}</td>
+                        <td style="text-align: center; font-weight: bold;">${actualClosing}</td>
+                        <td style="text-align: right;">UGX ${costValue.toFixed(0).toLocaleString()}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Open modal
+        openModal('periodPreviewModal');
+        console.log('✓ Period preview loaded');
+    } catch (error) {
+        console.error('Failed to load period preview:', error);
+        alert('Failed to load period preview: ' + error.message);
+    }
+}
+
+// ============================================
+// STOCK TAKING
+// ============================================
+async function startStockTaking() {
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        // Load active products
+        if (!adminProducts || adminProducts.length === 0) {
+            await loadProductsForDropdown();
+        }
+
+        // Show stock taking panel
+        const panel = document.getElementById('stockTakingPanel');
+        if (!panel) {
+            alert('Stock Taking panel not found');
+            return;
+        }
+
+        panel.style.display = 'block';
+        
+        // Create form for physical count entry
+        const form = document.getElementById('stockTakingForm');
+        if (!form) return;
+
+        const products = adminProducts.filter(p => p.status === 'active');
+
+        let html = `
+            <div style="margin: 20px 0;">
+                <p style="color: #666; margin-bottom: 15px;">
+                    <strong>Instruction:</strong> For each product below, enter the physical count from your physical inventory.
+                    The system will calculate the variance (difference from system stock).
+                </p>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>System Stock</th>
+                            <th>Physical Count</th>
+                            <th>Variance</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stockTakingBody">
+        `;
+
+        products.forEach(p => {
+            html += `
+                <tr>
+                    <td>${p.name}</td>
+                    <td style="text-align: center;"><strong>${p.current_stock}</strong></td>
+                    <td>
+                        <input type="number" class="physical-count" data-product-id="${p.id}" 
+                               data-system-stock="${p.current_stock}" 
+                               style="width: 100%; padding: 5px; border: 1px solid #ddd;" 
+                               min="0" placeholder="Enter count" >
+                    </td>
+                    <td style="text-align: center;"><span class="variance-display" data-product-id="${p.id}">-</span></td>
+                </tr>
+            `;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="submitStockTaking()">✓ Submit Count</button>
+                    <button class="btn btn-secondary" onclick="cancelStockTaking()">✗ Cancel</button>
+                </div>
+            </div>
+        `;
+
+        form.innerHTML = html;
+
+        // Add event listeners for variance calculation
+        const inputs = document.querySelectorAll('.physical-count');
+        inputs.forEach(input => {
+            input.addEventListener('change', function() {
+                const systemStock = parseInt(this.dataset.systemStock);
+                const physicalCount = parseInt(this.value) || 0;
+                const variance = physicalCount - systemStock;
+                
+                const varianceDisplay = document.querySelector(
+                    `.variance-display[data-product-id="${this.dataset.productId}"]`
+                );
+                if (varianceDisplay) {
+                    varianceDisplay.textContent = variance >= 0 ? '+' + variance : variance;
+                    varianceDisplay.style.color = variance === 0 ? 'green' : variance > 0 ? 'orange' : 'red';
+                }
+            });
+        });
+
+        console.log('✓ Stock taking form initialized');
+    } catch (error) {
+        console.error('Failed to start stock taking:', error);
+        alert('Failed to start stock taking: ' + error.message);
+    }
+}
+
+async function submitStockTaking() {
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const inputs = document.querySelectorAll('.physical-count');
+        let hasData = false;
+        const counts = [];
+
+        inputs.forEach(input => {
+            const physicalCount = parseInt(input.value);
+            if (!isNaN(physicalCount)) {
+                hasData = true;
+                counts.push({
+                    product_id: parseInt(input.dataset.productId),
+                    physical_count: physicalCount,
+                    period_id: currentPeriod ? currentPeriod.id : 1
+                });
+            }
+        });
+
+        if (!hasData) {
+            alert('Please enter at least one physical count');
+            return;
+        }
+
+        // Submit each count
+        const results = [];
+        let errors = [];
+        
+        for (const count of counts) {
+            try {
+                const response = await fetch(`${API_BASE}/inventory/physical-count`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(count)
+                });
+
+                // Check if response is ok
+                if (!response.ok) {
+                    const text = await response.text();
+                    console.error('Response status:', response.status);
+                    console.error('Response text:', text);
+                    errors.push(`Product ${count.product_id}: ${response.status} error`);
+                    continue;
+                }
+
+                // Try to parse JSON
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    console.error('JSON parse error:', parseError);
+                    const text = await response.text();
+                    console.error('Response was:', text);
+                    errors.push(`Product ${count.product_id}: Invalid server response`);
+                    continue;
+                }
+
+                if (data.success) {
+                    results.push(data.data);
+                } else {
+                    errors.push(`Product ${count.product_id}: ${data.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                errors.push(`Product ${count.product_id}: ${error.message}`);
+            }
+        }
+
+        // Show results
+        let message = `✓ Stock taking completed!\n${results.length} products counted.`;
+        if (errors.length > 0) {
+            message += `\n\n⚠️ Errors:\n${errors.join('\n')}`;
+        }
+        alert(message);
+        
+        // Reload adjustments table
+        await loadAdjustments();
+        
+        // Reset form
+        cancelStockTaking();
+        
+        console.log('✓ Stock taking submitted');
+    } catch (error) {
+        console.error('Failed to submit stock taking:', error);
+        alert('Failed to submit: ' + error.message);
+    }
+}
+
+function cancelStockTaking() {
+    const panel = document.getElementById('stockTakingPanel');
+    if (panel) {
+        panel.style.display = 'none';
+    }
+    
+    const form = document.getElementById('stockTakingForm');
+    if (form) {
+        form.innerHTML = '';
+    }
+}
+
+async function loadAdjustments() {
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const periodId = currentPeriod ? currentPeriod.id : 1;
+        
+        const response = await fetch(
+            `${API_BASE}/inventory/adjustments?period_id=${periodId}`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to load adjustments');
+        }
+
+        const adjustments = data.data.adjustments || [];
+        const tbody = document.getElementById('adjustmentsTableBody');
+
+        if (adjustments.length === 0) {
+            tbody.innerHTML = '<tr class="empty-state"><td colspan="5" class="text-center">No adjustments recorded</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = adjustments.map(adj => `
+            <tr>
+                <td>${formatDateTime(adj.created_at)}</td>
+                <td>${adj.product_name}</td>
+                <td>${adj.variance >= 0 ? '+' : ''}${adj.variance}</td>
+                <td>${adj.notes || 'Stock taking'}</td>
+                <td>${adj.recorded_by_name || 'Unknown'}</td>
+            </tr>
+        `).join('');
+
+        console.log(`✓ Loaded ${adjustments.length} adjustments`);
+    } catch (error) {
+        console.error('Failed to load adjustments:', error);
+    }
+}
+
+function recordAdjustment() {
+    alert('Use "Start Stock Count" to properly record adjustments with system stock comparison.');
 }
 
 // ============================================
@@ -1216,6 +2115,7 @@ function displayStockReport(reportData) {
     
     const products = reportData.products || [];
     const summary = reportData.summary || {};
+    const movement = summary.stock_movement || {};
     
     // Calculate totals from products
     let totalCostValue = 0;
@@ -1250,48 +2150,44 @@ function displayStockReport(reportData) {
         </div>
         
         <div class="report-summary">
-            <h4>Summary</h4>
-            <table class="report-table">
+            <h4>Overall Stock Movement</h4>
+            <table class="report-table" style="font-weight: bold; background: #f8f9fa;">
                 <tr>
-                    <th>Total Products</th>
-                    <td>${summary.total_products || 0}</td>
+                    <th>Opening Stock</th>
+                    <td>${safeNumber(movement.opening_stock, 0).toLocaleString()} units</td>
                 </tr>
-                <tr>
-                    <th>Total Stock Value (Cost)</th>
-                    <td>UGX ${totalCostValue.toFixed(0)}</td>
+                <tr style="color: green;">
+                    <th>+ Purchases</th>
+                    <td>+${safeNumber(movement.purchases, 0).toLocaleString()} units</td>
                 </tr>
-                <tr>
-                    <th>Total Stock Value (Retail)</th>
-                    <td>UGX ${totalRetailValue.toFixed(0)}</td>
+                <tr style="color: red;">
+                    <th>- Sales</th>
+                    <td>-${safeNumber(movement.sales, 0).toLocaleString()} units</td>
                 </tr>
-                <tr>
-                    <th>Potential Profit</th>
-                    <td>UGX ${potentialProfit.toFixed(0)}</td>
+                <tr style="color: orange;">
+                    <th>± Adjustments</th>
+                    <td>${safeNumber(movement.adjustments, 0) >= 0 ? '+' : ''}${safeNumber(movement.adjustments, 0).toLocaleString()} units</td>
                 </tr>
-                <tr>
-                    <th>Out of Stock</th>
-                    <td>${summary.out_of_stock || 0}</td>
-                </tr>
-                <tr>
-                    <th>Low Stock</th>
-                    <td>${summary.low_stock || 0}</td>
+                <tr style="font-size: 1.1em; background: #e3f2fd; border-top: 2px solid #333;">
+                    <th>= Current Stock</th>
+                    <td>${safeNumber(movement.calculated_closing, 0).toLocaleString()} units</td>
                 </tr>
             </table>
         </div>
         
         <div class="report-products">
-            <h4>Product Details</h4>
+            <h4>Product Details with Stock Movement</h4>
             ${enrichedProducts.length === 0 ? '<p>No products found</p>' : `
                 <table class="report-table">
                     <thead>
                         <tr>
                             <th>Product</th>
+                            <th>Opening</th>
+                            <th>Purchases</th>
+                            <th>Sales</th>
+                            <th>Adjustments</th>
                             <th>Current Stock</th>
-                            <th>Cost Price</th>
-                            <th>Selling Price</th>
-                            <th>Cost Value</th>
-                            <th>Retail Value</th>
-                            <th>Margin</th>
+                            <th>Value (Cost)</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -1299,13 +2195,17 @@ function displayStockReport(reportData) {
                         ${enrichedProducts.map(p => `
                             <tr>
                                 <td>${p.name || 'Unknown'}</td>
-                                <td>${safeNumber(p.current_stock, 0)}</td>
-                                <td>UGX ${safeNumber(p.cost_price).toFixed(0)}</td>
-                                <td>UGX ${safeNumber(p.selling_price).toFixed(0)}</td>
+                                <td>${safeNumber(p.opening_stock, 0)}</td>
+                                <td style="color: green;">+${safeNumber(p.total_purchases, 0)}</td>
+                                <td style="color: red;">-${safeNumber(p.total_sales, 0)}</td>
+                                <td style="color: orange;">${safeNumber(p.total_adjustments, 0) >= 0 ? '+' : ''}${safeNumber(p.total_adjustments, 0)}</td>
+                                <td style="font-weight: bold;">${safeNumber(p.current_stock, 0)}</td>
                                 <td>UGX ${p.costValue.toFixed(0)}</td>
-                                <td>UGX ${p.retailValue.toFixed(0)}</td>
-                                <td>${p.marginPercent.toFixed(1)}%</td>
-                                <td><span class="badge badge-${p.stock_status === 'ADEQUATE' ? 'success' : p.stock_status === 'LOW_STOCK' ? 'warning' : 'danger'}">${p.stock_status || 'N/A'}</span></td>
+                                <td>
+                                    <span class="badge badge-${p.stock_status === 'OUT_OF_STOCK' ? 'inactive' : p.stock_status === 'LOW_STOCK' ? 'draft' : 'active'}">
+                                        ${p.stock_status || 'N/A'}
+                                    </span>
+                                </td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -1356,90 +2256,130 @@ function displayMonthlyReport(reportData) {
     const reversals = reportData.reversals || {};
     const audit = reportData.audit || {};
     const topProducts = sales.top_products || [];
+    const stockMovement = reportData.stock_movement || {};
+    const productMovements = stockMovement.by_product || [];
     
     let html = `
-        <div class="report-header">
-            <h3>Period Summary Report</h3>
-            <p>Period: ${reportData.period_name || 'Unknown'}</p>
-            <p>Duration: ${reportData.date_range?.start || 'N/A'} - ${reportData.date_range?.end || 'Ongoing'}</p>
-            <p>Status: <span class="badge badge-${reportData.period_status === 'OPEN' ? 'active' : 'closed'}">${reportData.period_status || 'Unknown'}</span></p>
-            ${audit.backdated_entries > 0 ? '<p class="warning">⚠️ This period includes ' + audit.backdated_entries + ' backdated transactions</p>' : ''}
+        <div class="report-header" style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div>
+                <h3>Period Summary Report</h3>
+                <p>Period: ${reportData.period_name || 'Unknown'}</p>
+                <p>Duration: ${reportData.date_range?.start || 'N/A'} - ${reportData.date_range?.end || 'Ongoing'}</p>
+                <p>Status: <span class="badge badge-${reportData.period_status === 'OPEN' ? 'active' : 'closed'}">${reportData.period_status || 'Unknown'}</span></p>
+                ${audit.backdated_entries > 0 ? '<p class="warning">⚠️ This period includes ' + audit.backdated_entries + ' backdated transactions</p>' : ''}
+            </div>
+            <button class="btn btn-secondary" onclick="exportMonthlyReportToPDF('${reportData.period_name || 'Report'}')" style="padding: 8px 16px; white-space: nowrap; margin-top: 5px;">
+                📄 Export as PDF
+            </button>
         </div>
         
         <div class="report-summary">
-            <h4>Financial Summary</h4>
-            <table class="report-table">
+            <h4>Period Stock Movement</h4>
+            <table class="report-table" style="font-weight: bold; background: #f8f9fa;">
                 <tr>
-                    <th>Total Sales Revenue</th>
-                    <td>UGX ${safeNumber(sales.total_amount).toFixed(0)}</td>
+                    <th>Opening Stock</th>
+                    <td>${safeNumber(stockMovement.opening_stock, 0).toLocaleString()} units</td>
                 </tr>
-                <tr>
-                    <th>Total Purchase Cost</th>
-                    <td>UGX ${safeNumber(purchases.total_amount).toFixed(0)}</td>
+                <tr style="color: green;">
+                    <th>+ Purchases</th>
+                    <td>+${safeNumber(stockMovement.purchases, 0).toLocaleString()} units</td>
                 </tr>
-                <tr>
-                    <th>Gross Profit</th>
-                    <td>UGX ${safeNumber(profit.gross_profit).toFixed(0)}</td>
+                <tr style="color: red;">
+                    <th>- Sales</th>
+                    <td>-${safeNumber(stockMovement.sales, 0).toLocaleString()} units</td>
                 </tr>
-                <tr>
-                    <th>Profit Margin</th>
-                    <td>${safeNumber(profit.margin_percent).toFixed(1)}%</td>
+                <tr style="color: orange;">
+                    <th>± Adjustments</th>
+                    <td>${safeNumber(stockMovement.adjustments, 0) >= 0 ? '+' : ''}${safeNumber(stockMovement.adjustments, 0).toLocaleString()} units</td>
                 </tr>
-            </table>
-            
-            <h4>Transaction Counts</h4>
-            <table class="report-table">
-                <tr>
-                    <th>Total Transactions</th>
-                    <td>${safeNumber(audit.total_transactions, 0)}</td>
+                <tr style="font-size: 1.1em; background: #e3f2fd; border-top: 2px solid #333;">
+                    <th>= Closing Stock</th>
+                    <td>${safeNumber(stockMovement.calculated_closing, 0).toLocaleString()} units</td>
                 </tr>
-                <tr>
-                    <th>Total Sales</th>
-                    <td>${safeNumber(sales.transaction_count, 0)} (${safeNumber(sales.total_quantity, 0)} items)</td>
+                ${stockMovement.variance && Math.abs(stockMovement.variance) > 0 ? `
+                <tr style="color: red;">
+                    <th>Variance</th>
+                    <td>${stockMovement.variance} units (Actual: ${safeNumber(stockMovement.actual_closing, 0)})</td>
                 </tr>
-                <tr>
-                    <th>Total Purchases</th>
-                    <td>${safeNumber(purchases.transaction_count, 0)} (${safeNumber(purchases.total_quantity, 0)} items)</td>
-                </tr>
-                <tr>
-                    <th>Total Adjustments</th>
-                    <td>${safeNumber(adjustments.count, 0)}</td>
-                </tr>
-                <tr>
-                    <th>Total Reversals</th>
-                    <td>${safeNumber(reversals.count, 0)}</td>
-                </tr>
+                ` : ''}
             </table>
         </div>
         
-        <div class="report-top-products">
-            <h4>Top Selling Products</h4>
-            ${topProducts.length === 0 ? '<p>No sales data available</p>' : `
-                <table class="report-table">
-                    <thead>
-                        <tr>
-                            <th>Product</th>
-                            <th>Units Sold</th>
-                            <th>Revenue</th>
-                            <th>Transactions</th>
+        ${productMovements.length > 0 ? `
+        <div class="report-product-movements">
+            <h4>Product-Level Stock Movement</h4>
+            <table class="report-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Opening</th>
+                        <th>Purchases</th>
+                        <th>Sales</th>
+                        <th>Adjustments</th>
+                        <th>Calculated Closing</th>
+                        <th>Actual Closing</th>
+                        <th>Variance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${productMovements.map(pm => `
+                        <tr ${pm.variance && Math.abs(pm.variance) > 0 ? 'style="background: #fff3cd;"' : ''}>
+                            <td>${pm.product_name || 'Unknown'}</td>
+                            <td>${safeNumber(pm.opening_stock, 0)}</td>
+                            <td style="color: green;">+${safeNumber(pm.purchases, 0)}</td>
+                            <td style="color: red;">-${safeNumber(pm.sales, 0)}</td>
+                            <td style="color: orange;">${safeNumber(pm.adjustments, 0) >= 0 ? '+' : ''}${safeNumber(pm.adjustments, 0)}</td>
+                            <td style="font-weight: bold;">${safeNumber(pm.calculated_closing, 0)}</td>
+                            <td>${safeNumber(pm.closing_stock, 0)}</td>
+                            <td ${pm.variance && Math.abs(pm.variance) > 0 ? 'style="color: red; font-weight: bold;"' : ''}>
+                                ${pm.variance && Math.abs(pm.variance) > 0 ? safeNumber(pm.variance, 0) : '-'}
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        ${topProducts.map(p => `
-                            <tr>
-                                <td>${p.product_name || 'Unknown'}</td>
-                                <td>${safeNumber(p.quantity, 0)}</td>
-                                <td>UGX ${safeNumber(p.amount).toFixed(0)}</td>
-                                <td>${safeNumber(p.count, 0)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `}
+                    `).join('')}
+                </tbody>
+            </table>
         </div>
+        ` : ''}
     `;
     
     container.innerHTML = html;
+}
+
+// Export Monthly Report to PDF
+function exportMonthlyReportToPDF(periodName) {
+    try {
+        const element = document.getElementById('monthlyReportContent');
+        if (!element) {
+            alert('Report not found');
+            return;
+        }
+        
+        const opt = {
+            margin: 10,
+            filename: `period_report_${periodName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2 },
+            jsPDF: { orientation: 'landscape', unit: 'mm', format: 'a4' }
+        };
+        
+        // Clone the element to avoid modifying original
+        const clone = element.cloneNode(true);
+        
+        // Remove the export button from PDF
+        const buttons = clone.querySelectorAll('button');
+        buttons.forEach(btn => {
+            if (btn.textContent.includes('Export') || btn.textContent.includes('PDF')) {
+                btn.remove();
+            }
+        });
+        
+        // Create PDF
+        html2pdf().set(opt).from(clone).save();
+        
+    } catch (error) {
+        console.error('PDF generation failed:', error);
+        alert('Failed to generate PDF: ' + error.message);
+    }
 }
 
 // ============================================
@@ -1458,13 +2398,15 @@ function formatDateTime(datetime) {
 
 function openModal(modalId) {
     const modal = document.getElementById(modalId);
-    if (modal) modal.style.display = 'block';
+    if (modal) {
+        modal.classList.add('active');
+    }
 }
 
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
-        modal.style.display = 'none';
+        modal.classList.remove('active');
         // Reset form if it exists
         const form = modal.querySelector('form');
         if (form) form.reset();
@@ -1474,7 +2416,7 @@ function closeModal(modalId) {
 // Close modals when clicking outside
 window.onclick = function(event) {
     if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
+        event.target.classList.remove('active');
     }
 };
 

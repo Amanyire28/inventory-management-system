@@ -52,6 +52,10 @@ try {
             handleOutOfStock($product);
             break;
             
+        case 'search':
+            handleSearch($product);
+            break;
+            
         default:
             http_response_code(404);
             echo json_encode(['error' => 'Action not found']);
@@ -100,7 +104,7 @@ function handleCreate($product) {
     
     $data = json_decode(file_get_contents('php://input'), true);
     
-    $required = ['name', 'code', 'selling_price', 'cost_price'];
+    $required = ['name', 'selling_price', 'cost_price'];
     foreach ($required as $field) {
         if (!isset($data[$field])) {
             http_response_code(400);
@@ -111,9 +115,9 @@ function handleCreate($product) {
     
     if ($product->create(
         $data['name'],
-        $data['code'],
         $data['selling_price'],
         $data['cost_price'],
+        $data['opening_stock'] ?? 0,
         $data['reorder_level'] ?? 50,
         $data['category'] ?? null
     )) {
@@ -188,6 +192,29 @@ function handleLowStock($product) {
 
 function handleOutOfStock($product) {
     $products = $product->getOutOfStock();
+    
+    echo json_encode([
+        'success' => true,
+        'count' => count($products),
+        'data' => $products
+    ]);
+}
+
+function handleSearch($product) {
+    $searchTerm = $_GET['q'] ?? '';
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 5;
+    $active_only = isset($_GET['active_only']) ? (bool)$_GET['active_only'] : true;
+    
+    if (empty($searchTerm)) {
+        echo json_encode([
+            'success' => true,
+            'count' => 0,
+            'data' => []
+        ]);
+        return;
+    }
+    
+    $products = $product->search($searchTerm, $limit, $active_only);
     
     echo json_encode([
         'success' => true,

@@ -41,7 +41,7 @@ class ProductService {
      * opening_stock is IMMUTABLE after creation
      * current_stock is calculated from transactions
      */
-    public static function createProduct($name, $code, $selling_price, $cost_price, $opening_stock = 0, $reorder_level = 10) {
+    public static function createProduct($name, $selling_price, $cost_price, $opening_stock = 0, $reorder_level = 10) {
         
         Auth::requireRole(['admin']);
         
@@ -67,21 +67,13 @@ class ProductService {
                 throw new Exception("Opening stock must be non-negative");
             }
             
-            // Check duplicate code
-            if ($code) {
-                $existing = $db->fetch("SELECT id FROM products WHERE code = ?", [$code]);
-                if ($existing) {
-                    throw new Exception("Product code already exists");
-                }
-            }
-            
             // Insert product
             $stmt = $db->getConnection()->prepare(
-                "INSERT INTO products (name, code, selling_price, cost_price, opening_stock, current_stock, reorder_level, status) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, 'active')"
+                "INSERT INTO products (name, selling_price, cost_price, opening_stock, current_stock, reorder_level, status) 
+                 VALUES (?, ?, ?, ?, ?, ?, 'active')"
             );
             
-            $stmt->bind_param('ssdddii', $name, $code, $selling_price, $cost_price, $opening_stock, $opening_stock, $reorder_level);
+            $stmt->bind_param('sdddii', $name, $selling_price, $cost_price, $opening_stock, $opening_stock, $reorder_level);
             
             if (!$stmt->execute()) {
                 throw new Exception("Failed to create product: " . $stmt->error);
@@ -91,7 +83,6 @@ class ProductService {
             
             AuditLog::log('CREATE_PRODUCT', 'products', $product_id, null, [
                 'name' => $name,
-                'code' => $code,
                 'opening_stock' => $opening_stock
             ]);
             

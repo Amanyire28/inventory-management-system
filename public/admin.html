@@ -91,7 +91,12 @@
                     <div class="section-content">
                         <!-- TODAY's SUMMARY -->
                         <div class="today-summary">
-                            <h3>Today's Summary</h3>
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                                <h3>Today's Summary</h3>
+                                <button class="btn btn-secondary" onclick="refreshDashboard()" style="padding: 8px 16px;">
+                                    🔄 Refresh
+                                </button>
+                            </div>
                             <div class="metrics-grid">
                                 <div class="metric-card">
                                     <span class="metric-label">Today's Revenue</span>
@@ -101,7 +106,7 @@
                                 <div class="metric-card">
                                     <span class="metric-label">Today's Purchases</span>
                                     <span class="metric-value" id="todayPurchases">UGX 0</span>
-                                    <span class="metric-change">...</span>
+                                    <span class="metric-change" id="todayPurchasesCount">0 purchases</span>
                                 </div>
                             </div>
                         </div>
@@ -112,23 +117,23 @@
                             <div class="metrics-grid">
                                 <div class="metric-card">
                                     <span class="metric-label">Sales Revenue</span>
-                                    <span class="metric-value">UGX 0.00</span>
-                                    <span class="metric-change">Loading...</span>
+                                    <span class="metric-value" id="metricSalesRevenue">UGX 0</span>
+                                    <span class="metric-change" id="metricSalesCount">0 sales today</span>
                                 </div>
                                 <div class="metric-card">
                                     <span class="metric-label">Purchases</span>
-                                    <span class="metric-value">UGX 0.00</span>
-                                    <span class="metric-change">Loading...</span>
+                                    <span class="metric-value" id="metricPurchasesAmount">UGX 0</span>
+                                    <span class="metric-change" id="metricPurchasesCount">0 purchases today</span>
                                 </div>
                                 <div class="metric-card">
                                     <span class="metric-label">Units Voided</span>
-                                    <span class="metric-value">0</span>
-                                    <span class="metric-change">...</span>
+                                    <span class="metric-value" id="metricVoidedUnits">0</span>
+                                    <span class="metric-change" id="metricVoidedCount">0 voids</span>
                                 </div>
                                 <div class="metric-card">
                                     <span class="metric-label">Low Stock Items</span>
-                                    <span class="metric-value">0</span>
-                                    <span class="metric-change">...</span>
+                                    <span class="metric-value" id="metricLowStock">0</span>
+                                    <span class="metric-change" id="metricLowStockText">0 items need attention</span>
                                 </div>
                             </div>
                         </div>
@@ -172,12 +177,13 @@
                             <h2>Inventory Management</h2>
                             <div class="actions">
                                 <button class="btn btn-primary" onclick="openProductForm()">+ ADD PRODUCT</button>
+                                <button class="btn btn-secondary" onclick="openImportProductsModal()">📥 IMPORT PRODUCTS</button>
                             </div>
                         </div>
 
                         <div class="filters">
-                            <input type="text" id="productSearch" placeholder="Search products..." oninput="searchProducts()">
-                            <select id="productStatusFilter" onchange="filterProducts()">
+                            <input type="text" id="productSearch" placeholder="Search products..." oninput="debouncedFilterProducts()" onfocus="filterProducts()" onblur="setTimeout(hideSearchResults, 200)">
+                            <select id="productStatusFilter" onchange="loadProductsTable()">
                                 <option value="all">All Status</option>
                                 <option value="active">Active</option>
                                 <option value="inactive">Inactive</option>
@@ -188,7 +194,6 @@
                             <thead>
                                 <tr>
                                     <th>Product Name</th>
-                                    <th>Code</th>
                                     <th>Current Stock</th>
                                     <th>Reorder Level</th>
                                     <th>Selling Price</th>
@@ -341,6 +346,83 @@
                     </div>
                 </section>
 
+                <!-- PERIOD PREVIEW MODAL -->
+                <div id="periodPreviewModal" class="modal">
+                    <div class="modal-content" style="max-width: 900px; max-height: 85vh; overflow-y: auto;">
+                        <div class="modal-header">
+                            <h2>Period Preview: <span id="previewPeriodName"></span></h2>
+                            <button class="modal-close" onclick="closeModal('periodPreviewModal')">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <!-- Period Info -->
+                            <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+                                <h3>Period Information</h3>
+                                <table style="width: 100%;">
+                                    <tr>
+                                        <td><strong>Status:</strong></td>
+                                        <td><span id="previewPeriodStatus"></span></td>
+                                        <td style="padding-left: 40px;"><strong>Start Date:</strong></td>
+                                        <td id="previewStartDate"></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>End Date:</strong></td>
+                                        <td id="previewEndDate"></td>
+                                        <td style="padding-left: 40px;"><strong>Created:</strong></td>
+                                        <td id="previewCreatedAt"></td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Transaction Summary -->
+                            <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+                                <h3>Transaction Summary</h3>
+                                <table style="width: 100%;">
+                                    <tr>
+                                        <td><strong>Total Transactions:</strong></td>
+                                        <td id="previewTotalTransactions">0</td>
+                                        <td style="padding-left: 40px;"><strong>Total Sales:</strong></td>
+                                        <td id="previewTotalSales">UGX 0</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Total Purchases:</strong></td>
+                                        <td id="previewTotalPurchases">UGX 0</td>
+                                        <td style="padding-left: 40px;"><strong>Adjustments:</strong></td>
+                                        <td id="previewTotalAdjustments">0 units</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Reversals:</strong></td>
+                                        <td id="previewReversalCount">0</td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- Product-Level Details -->
+                            <div style="margin-bottom: 20px;">
+                                <h3>Product-Level Stock Movement</h3>
+                                <table class="data-table" style="font-size: 0.95em;">
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th style="text-align: center;">Opening Stock</th>
+                                            <th style="text-align: center;">Purchases</th>
+                                            <th style="text-align: center;">Sales</th>
+                                            <th style="text-align: center;">Adjustments</th>
+                                            <th style="text-align: center;">Calculated Closing</th>
+                                            <th style="text-align: center;">Actual Closing</th>
+                                            <th style="text-align: center;">Value (Cost)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="previewProductsBody">
+                                        <tr>
+                                            <td colspan="8" class="text-center">Loading products...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- AUDIT LOG SECTION -->
                 <section id="audit" class="section">
                     <div class="section-content">
@@ -441,31 +523,32 @@
                     <input type="hidden" id="productId">
                     <div class="form-group">
                         <label>Product Name *</label>
-                        <input type="text" name="name" required>
-                    </div>
-                    <div class="form-group">
-                        <label>Product Code</label>
-                        <input type="text" name="code">
-                    </div>
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea name="description" rows="3"></textarea>
+                        <input type="text" name="name" id="productName" required>
                     </div>
                     <div class="form-group">
                         <label>Selling Price (UGX) *</label>
-                        <input type="number" name="selling_price" required min="0" step="1">
+                        <input type="number" name="selling_price" id="productSellingPrice" required min="0" step="1">
                     </div>
                     <div class="form-group">
                         <label>Cost Price (UGX) *</label>
-                        <input type="number" name="cost_price" required min="0" step="1">
+                        <input type="number" name="cost_price" id="productCostPrice" required min="0" step="1">
                     </div>
                     <div class="form-group">
-                        <label>Opening Stock *</label>
-                        <input type="number" name="opening_stock" required min="0">
+                        <label>Opening Stock (Immutable) *</label>
+                        <input type="number" name="opening_stock" id="productOpeningStock" required min="0" step="1" value="0">
+                        <small>Initial quantity when adding product. Cannot be changed after creation.</small>
                     </div>
                     <div class="form-group">
                         <label>Reorder Level *</label>
-                        <input type="number" name="reorder_level" required min="1" value="10">
+                        <input type="number" name="reorder_level" id="productMinStock" required min="1" value="10">
+                        <small>Alert when stock falls below this level</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Status *</label>
+                        <select name="status" id="productStatus" required>
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
                     </div>
                 </form>
             </div>
@@ -476,50 +559,97 @@
         </div>
     </div>
 
-    <div id="purchaseFormModal" class="modal">
+    <div id="recordPurchaseModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h2>Record Purchase</h2>
-                <button type="button" class="modal-close" onclick="closeModal('purchaseFormModal')">&times;</button>
+                <button type="button" class="modal-close" onclick="closeModal('recordPurchaseModal')">&times;</button>
             </div>
             <div class="modal-body">
-                <form id="purchaseForm">
+                <form id="recordPurchaseForm">
                     <div class="form-group" style="display: block !important; visibility: visible !important;">
                         <label style="display: block;">Transaction Date & Time *</label>
-                        <input type="datetime-local" name="transaction_datetime" id="transaction_datetime" required style="display: block !important; width: 100% !important;">
+                        <input type="datetime-local" name="transaction_datetime" id="purchaseTransactionDatetime" required style="display: block !important; width: 100% !important;">
                         <small>Use this to backdate transactions. Defaults to now.</small>
                     </div>
                     <div class="form-group">
                         <label>Product *</label>
-                        <select name="product_id" required>
+                        <select name="product_id" id="purchaseProductId" required>
                             <option value="">-- Select Product --</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label>Quantity Received (units) *</label>
-                        <input type="number" name="quantity" required min="1">
+                        <input type="number" name="quantity" id="purchaseQuantity" required min="1">
                     </div>
                     <div class="form-group">
                         <label>Cost per Unit (UGX) *</label>
-                        <input type="number" name="cost_per_unit" required min="0">
+                        <input type="number" name="cost_per_unit" id="purchaseCostPrice" required min="0">
                     </div>
                     <div class="form-group">
                         <label>Supplier</label>
-                        <input type="text" name="supplier">
+                        <input type="text" name="supplier" id="purchaseSupplier">
                     </div>
                     <div class="form-group">
                         <label>Batch/Lot Number</label>
-                        <input type="text" name="batch_number">
+                        <input type="text" name="batch_number" id="purchaseBatchNumber">
                     </div>
                     <div class="form-group">
                         <label>Expiry Date</label>
-                        <input type="date" name="expiry_date">
+                        <input type="date" name="expiry_date" id="purchaseExpiryDate">
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('purchaseFormModal')">Cancel</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('recordPurchaseModal')">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="savePurchase()">Record Purchase</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Products Modal -->
+    <div id="importProductsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Import Products from CSV</h2>
+                <button type="button" class="modal-close" onclick="closeModal('importProductsModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info" style="background: #e0f2fe; border-left: 4px solid #0ea5e9; padding: 15px; margin-bottom: 20px;">
+                    <strong>📋 CSV Format:</strong> Your file should have headers and these columns:
+                    <ul style="margin: 10px 0 0 20px;">
+                        <li><strong>name</strong> - Product name (required)</li>
+                        <li><strong>opening_stock</strong> - Initial stock quantity (required, immutable)</li>
+                        <li><strong>selling_price</strong> - Selling price in UGX (required)</li>
+                        <li><strong>cost_price</strong> - Cost price in UGX (required)</li>
+                        <li><strong>reorder_level</strong> - Reorder level (optional, default: 10)</li>
+                    </ul>
+                    <p style="margin-top: 10px;"><strong>Example:</strong></p>
+                    <code style="display: block; background: white; padding: 10px; border-radius: 4px; font-size: 12px;">
+name,opening_stock,selling_price,cost_price,reorder_level<br>
+Coca Cola 500ml,100,2000,1500,20<br>
+Fanta Orange 500ml,80,2000,1500,20
+                    </code>
+                    <button type="button" class="btn btn-secondary" onclick="downloadCSVTemplate()" style="margin-top: 10px;">📥 Download Template</button>
+                </div>
+                <div class="form-group">
+                    <label>Select CSV File *</label>
+                    <input type="file" id="importFileInput" accept=".csv" style="display: block; padding: 10px; border: 2px dashed #cbd5e1; border-radius: 8px; width: 100%;">
+                </div>
+                <div id="importPreview" style="display: none; margin-top: 20px;">
+                    <h3>Preview (First 5 rows)</h3>
+                    <div style="overflow-x: auto;">
+                        <table class="data-table" id="importPreviewTable">
+                            <thead id="importPreviewHeader"></thead>
+                            <tbody id="importPreviewBody"></tbody>
+                        </table>
+                    </div>
+                    <p id="importStats" style="margin-top: 10px; font-weight: 600;"></p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('importProductsModal')">Cancel</button>
+                <button type="button" class="btn btn-primary" id="importProductsBtn" onclick="processImportProducts()" disabled>Import Products</button>
             </div>
         </div>
     </div>
@@ -552,6 +682,8 @@
     <script>
         window.API_BASE = '/topinv/api';
     </script>
+    <!-- PDF Generation Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
     <script src="/topinv/public/js/common.js"></script>
     <script src="/topinv/public/js/admin.js"></script>
 </body>

@@ -110,7 +110,6 @@
                 products = data.data.products.map(p => ({
                     id: p.id,
                     name: p.name,
-                    code: p.code || 'N/A',
                     price: parseFloat(p.selling_price),
                     stock: parseInt(p.current_stock),
                     status: p.status
@@ -145,10 +144,8 @@
                 }
                 
                 const filtered = products.filter(p => 
-                    p.status === 'active' && (
-                        p.name.toLowerCase().includes(searchTerm) || 
-                        (p.code && p.code.toLowerCase().includes(searchTerm))
-                    )
+                    p.status === 'active' && 
+                    p.name.toLowerCase().includes(searchTerm)
                 );
                 
                 log(`✅ Found ${filtered.length} matches`);
@@ -157,7 +154,7 @@
                     dropdown.innerHTML = filtered.slice(0, 10).map(p => `
                         <div class="dropdown-item">
                             <strong>${p.name}</strong><br>
-                            <small>Code: ${p.code} | Stock: ${p.stock} | Price: ₱${p.price.toFixed(2)}</small>
+                            <small>Stock: ${p.stock} | Price: ₱${p.price.toFixed(2)}</small>
                         </div>
                     `).join('');
                     dropdown.classList.add('active');

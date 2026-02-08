@@ -10,12 +10,12 @@ class Product {
     
     public $id;
     public $name;
-    public $code;
     public $category;
     public $selling_price;
     public $cost_price;
-    public $reorder_level;
+    public $opening_stock;
     public $current_stock;
+    public $reorder_level;
     public $active;
     public $created_at;
     
@@ -30,16 +30,15 @@ class Product {
         $query = "CREATE TABLE IF NOT EXISTS {$this->table} (
             id INT PRIMARY KEY AUTO_INCREMENT,
             name VARCHAR(100) NOT NULL,
-            code VARCHAR(50) UNIQUE NOT NULL,
             category VARCHAR(50),
             selling_price DECIMAL(10, 2) NOT NULL,
             cost_price DECIMAL(10, 2) NOT NULL,
-            reorder_level INT DEFAULT 50,
+            opening_stock INT NOT NULL DEFAULT 0,
             current_stock INT DEFAULT 0,
+            reorder_level INT DEFAULT 50,
             active BOOLEAN DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            KEY (code),
             KEY (active),
             KEY (category)
         )";
@@ -83,36 +82,14 @@ class Product {
         return $result->fetch_assoc();
     }
     
-    /**
-     * Get product by code
-     */
-    public function getByCode($code) {
-        $query = "SELECT * FROM {$this->table} WHERE code = ?";
-        
-        $stmt = $this->conn->prepare($query);
-        $stmt->bind_param('s', $code);
-        $stmt->execute();
-        
-        $result = $stmt->get_result();
-        
-        if ($result->num_rows === 0) {
-            return false;
-        }
-        
-        return $result->fetch_assoc();
-    }
     
     /**
      * Create product
      */
-    public function create($name, $code, $selling_price, $cost_price, $reorder_level = 50, $category = null) {
-        if ($this->codeExists($code)) {
-            return false;
-        }
-        
+    public function create($name, $selling_price, $cost_price, $opening_stock = 0, $reorder_level = 50, $category = null) {
         $query = "INSERT INTO {$this->table} 
-                  (name, code, category, selling_price, cost_price, reorder_level, active)
-                  VALUES (?, ?, ?, ?, ?, ?, 1)";
+                  (name, category, selling_price, cost_price, opening_stock, current_stock, reorder_level, active)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, 1)";
         
         $stmt = $this->conn->prepare($query);
         
@@ -120,7 +97,7 @@ class Product {
             return false;
         }
         
-        $stmt->bind_param('sssidi', $name, $code, $category, $selling_price, $cost_price, $reorder_level);
+        $stmt->bind_param('ssdddii', $name, $category, $selling_price, $cost_price, $opening_stock, $opening_stock, $reorder_level);
         
         return $stmt->execute();
     }
@@ -213,16 +190,26 @@ class Product {
     }
     
     /**
-     * Check if code exists
+     * Search products by name
      */
-    private function codeExists($code) {
-        $query = "SELECT id FROM {$this->table} WHERE code = ?";
+    public function search($searchTerm, $limit = 5, $active_only = true) {
+        $searchTerm = '%' . $searchTerm . '%';
+        
+        $query = "SELECT * FROM {$this->table} 
+                  WHERE name LIKE ?";
+        
+        if ($active_only) {
+            $query .= " AND active = 1";
+        }
+        
+        $query .= " ORDER BY name ASC LIMIT ?";
         
         $stmt = $this->conn->prepare($query);
-        $stmt->bind_param('s', $code);
+        $stmt->bind_param('si', $searchTerm, $limit);
         $stmt->execute();
         
-        return $stmt->get_result()->num_rows > 0;
+        $result = $stmt->get_result();
+        return $result->fetch_all(MYSQLI_ASSOC);
     }
 }
 ?>

@@ -106,7 +106,6 @@ async function loadProductsFromAPI() {
         cashierProducts = data.data.products.map(p => ({
             id: p.id,
             name: p.name,
-            code: p.code || '',
             price: parseFloat(p.selling_price),
             cost: parseFloat(p.cost_price),
             stock: p.current_stock,
@@ -138,11 +137,9 @@ function initSaleProductSearch() {
             dropdown.style.display = 'none';
             return;
         }
-
         searchTimeout = setTimeout(() => {
             const results = cashierProducts.filter(p => 
-                p.name.toLowerCase().includes(query) || 
-                p.code.toLowerCase().includes(query)
+                p.name.toLowerCase().includes(query)
             ).slice(0, 15);
 
             if (results.length === 0) {
@@ -154,7 +151,7 @@ function initSaleProductSearch() {
             dropdown.innerHTML = results.map(p => `
                 <div class="dropdown-item" onclick="selectSaleProduct(${p.id})">
                     <strong>${p.name}</strong>
-                    <small>Code: ${p.code} | Stock: ${p.stock} units | Price: UGX ${p.price.toFixed(0)}</small>
+                    <small>Stock: ${p.stock} units | Price: UGX ${p.price.toFixed(0)}</small>
                 </div>
             `).join('');
             dropdown.style.display = 'block';
@@ -593,9 +590,212 @@ async function loadRecentSales() {
 // ============================================
 // PURCHASE PRODUCT SEARCH (if needed)
 // ============================================
+// ============================================
+// PURCHASE PRODUCT SEARCH
+// ============================================
 function initPurchaseProductSearch() {
-    // Similar to sale search if purchase form exists...
-    console.log('Purchase search initialized');
+    const searchInput = document.getElementById('purchaseProductSearch');
+    const dropdown = document.getElementById('purchaseProductDropdown');
+
+    if (!searchInput || !dropdown) {
+        console.warn('Purchase search elements not found');
+        return;
+    }
+
+    let searchTimeout;
+
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.trim().toLowerCase();
+
+        if (query.length < 2) {
+            dropdown.innerHTML = '';
+            dropdown.style.display = 'none';
+            return;
+        }
+        searchTimeout = setTimeout(() => {
+            const results = cashierProducts.filter(p => 
+                p.name.toLowerCase().includes(query)
+            ).slice(0, 15);
+
+            if (results.length === 0) {
+                dropdown.innerHTML = '<div class="dropdown-item-empty">No products found</div>';
+                dropdown.style.display = 'block';
+                return;
+            }
+
+            dropdown.innerHTML = results.map(p => `
+                <div class="dropdown-item" onclick="selectPurchaseProduct(${p.id})">
+                    <strong>${p.name}</strong>
+                    <small>Current Stock: ${p.stock} units | Cost: UGX ${p.cost.toFixed(0)}</small>
+                </div>
+            `).join('');
+            dropdown.style.display = 'block';
+        }, 200);
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    console.log('✓ Purchase product search initialized');
+}
+
+function selectPurchaseProduct(productId) {
+    const product = cashierProducts.find(p => p.id === productId);
+    if (!product) return;
+
+    selectedPurchaseProduct = product;
+    currentPurchase.productId = productId;
+
+    // Hide dropdown
+    document.getElementById('purchaseProductDropdown').style.display = 'none';
+
+    // Show product info
+    document.getElementById('purchaseProductName').textContent = product.name;
+    document.getElementById('purchaseProductStock').textContent = `Current Stock: ${product.stock} units`;
+    document.getElementById('purchaseProductInfo').style.display = 'block';
+
+    // Show purchase details section
+    document.getElementById('purchaseQuantity').value = 1;
+    document.getElementById('purchaseCostPrice').value = product.cost.toFixed(2);
+    document.getElementById('purchaseSupplier').value = '';
+    document.getElementById('purchaseDetailsSection').style.display = 'block';
+
+    // Update line total
+    updatePurchaseLineTotal();
+
+    // Scroll to details
+    document.getElementById('purchaseDetailsSection').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    console.log(`Selected product: ${product.name}`);
+}
+
+function updatePurchaseLineTotal() {
+    if (!selectedPurchaseProduct) return;
+
+    const qty = parseInt(document.getElementById('purchaseQuantity').value) || 0;
+    const costPrice = parseFloat(document.getElementById('purchaseCostPrice').value) || 0;
+    const lineTotal = qty * costPrice;
+
+    document.getElementById('purchaseLineTotalAmount').textContent = lineTotal.toFixed(0);
+}
+
+function increasePurchaseQty() {
+    const input = document.getElementById('purchaseQuantity');
+    const current = parseInt(input.value) || 0;
+    input.value = current + 1;
+    updatePurchaseLineTotal();
+}
+
+function decreasePurchaseQty() {
+    const input = document.getElementById('purchaseQuantity');
+    const current = parseInt(input.value) || 1;
+    if (current > 1) {
+        input.value = current - 1;
+        updatePurchaseLineTotal();
+    }
+}
+
+function resetPurchaseForm() {
+    // Clear form
+    document.getElementById('purchaseProductSearch').value = '';
+    document.getElementById('purchaseProductInfo').style.display = 'none';
+    document.getElementById('purchaseDetailsSection').style.display = 'none';
+    
+    // Reset state
+    selectedPurchaseProduct = null;
+    currentPurchase = {
+        productId: null,
+        quantity: 1,
+        costPrice: 0,
+        supplier: ''
+    };
+    
+    console.log('Purchase form cleared');
+}
+
+async function completePurchase() {
+    if (!selectedPurchaseProduct) {
+        alert('Please select a product first');
+        return;
+    }
+
+    if (!currentPeriod || !currentPeriod.id) {
+        alert('No active period. Please check with admin to open a period.');
+        return;
+    }
+
+    const quantity = parseInt(document.getElementById('purchaseQuantity').value) || 0;
+    const costPrice = parseFloat(document.getElementById('purchaseCostPrice').value) || 0;
+    const supplier = document.getElementById('purchaseSupplier').value.trim();
+
+    if (quantity <= 0) {
+        alert('Please enter a valid quantity');
+        return;
+    }
+
+    if (costPrice <= 0) {
+        alert('Please enter a valid cost price');
+        return;
+    }
+
+    if (!supplier) {
+        alert('Please enter a supplier name');
+        return;
+    }
+
+    // Disable button during processing
+    const button = event.target;
+    button.disabled = true;
+    button.textContent = 'Recording...';
+
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const purchaseData = {
+            product_id: selectedPurchaseProduct.id,
+            quantity: quantity,
+            unit_cost: costPrice,
+            period_id: currentPeriod.id,
+            supplier: supplier
+        };
+
+        console.log('Recording purchase:', purchaseData);
+
+        const response = await fetch(`${API_BASE}/purchases`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(purchaseData)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to record purchase');
+        }
+
+        console.log('✓ Purchase recorded:', data);
+        
+        // Reset form and reload
+        resetPurchaseForm();
+        loadProductsFromAPI();
+        alert('Purchase recorded successfully!');
+        
+    } catch (error) {
+        console.error('Purchase error:', error);
+        alert('Failed to record purchase: ' + error.message);
+    } finally {
+        button.disabled = false;
+        button.textContent = '✓ RECORD PURCHASE';
+    }
 }
 
 // ============================================

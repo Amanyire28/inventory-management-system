@@ -44,7 +44,7 @@ class StockTakingService {
                  VALUES (?, ?, ?, ?, ?, ?)"
             );
             
-            $stmt->bind_param('iiiii', $product_id, $system_stock, $physical_count, $variance, $period_id, $user['user_id']);
+            $stmt->bind_param('iiiiii', $product_id, $system_stock, $physical_count, $variance, $period_id, $user['user_id']);
             
             if (!$stmt->execute()) {
                 throw new Exception("Failed to record count: " . $stmt->error);
@@ -60,7 +60,7 @@ class StockTakingService {
                 TransactionService::createTransaction(
                     'ADJUSTMENT',
                     $product_id,
-                    abs($variance), // Quantity is always positive
+                    $variance, // Preserve sign: negative = shortage, positive = surplus
                     $unit_price,
                     $period_id
                 );
@@ -125,7 +125,6 @@ class StockTakingService {
             "SELECT 
                 p.id,
                 p.name,
-                p.code,
                 sa.system_quantity,
                 sa.physical_quantity,
                 sa.variance,
