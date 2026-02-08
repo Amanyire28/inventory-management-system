@@ -1581,7 +1581,9 @@ async function openNewPeriodForm() {
 
         alert(`✓ Period "${periodName}" created successfully!`);
         await loadPeriodsTable();
-        console.log('✓ New period created');
+        await getCurrentPeriod();  // Update current period in sidebar
+        await loadDashboardMetrics();  // Refresh dashboard cards for new period
+        console.log('✓ New period created and dashboard refreshed');
     } catch (error) {
         console.error('Failed to create period:', error);
         alert('Failed to create period: ' + error.message);
