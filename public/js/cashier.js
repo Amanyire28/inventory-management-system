@@ -556,8 +556,34 @@ async function loadRecentSales() {
         });
 
         const data = await response.json();
-        if (response.ok && data.data) {
-            console.log(`Loaded ${data.data.sales.length} recent sales`);
+        if (response.ok && data.data && data.data.sales) {
+            const sales = data.data.sales;
+            console.log(`Loaded ${sales.length} recent sales`);
+            
+            const tbody = document.getElementById('myReceiptsBody');
+            if (tbody) {
+                if (sales.length === 0) {
+                    tbody.innerHTML = '<tr class="empty-state"><td colspan="4" class="text-center">No receipts yet</td></tr>';
+                } else {
+                    tbody.innerHTML = sales.map(sale => {
+                        const date = new Date(sale.transaction_date);
+                        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                        const dateStr = date.toLocaleDateString('en-US');
+                        
+                        return `
+                            <tr>
+                                <td>${sale.id}</td>
+                                <td>${dateStr} ${timeStr}</td>
+                                <td>${sale.product_name || 'N/A'} (${sale.quantity})</td>
+                                <td>UGX ${safeNumber(sale.total_amount).toFixed(0)}</td>
+                            </tr>
+                        `;
+                    }).join('');
+                    console.log(`✓ Displayed ${sales.length} receipts`);
+                }
+            } else {
+                console.error('Element #myReceiptsBody not found');
+            }
         }
     } catch (error) {
         console.error('Failed to load recent sales:', error);
