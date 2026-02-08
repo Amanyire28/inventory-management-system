@@ -86,69 +86,45 @@ class PeriodService {
                 "SELECT id FROM periods WHERE status = 'CLOSED' ORDER BY id DESC LIMIT 1"
             );
             
+            // Get previous period's closing stocks to carry forward
+            $previousPeriodId = null;
             if ($previousPeriod) {
-                // Copy closing stocks from previous period as opening for new period
                 $previousPeriodId = $previousPeriod['id'];
+            }
+            
+            // For each product, set its opening stock for this new period
+            foreach ($products as $product) {
+                $productId = $product['id'];
+                $openingStock = 0;
                 
-                foreach ($products as $product) {
-                    $productId = $product['id'];
-                    
-                    // IMPORTANT: Get CLOSING stock from previous period
+                if ($previousPeriodId) {
+                    // Previous period exists: Get its CLOSING stock to carry forward
                     $prevClosing = $db->fetch(
                         "SELECT closing_stock FROM period_product_opening_stock 
                          WHERE period_id = ? AND product_id = ?",
                         [$previousPeriodId, $productId]
                     );
                     
-                    // Use previous period's closing stock as opening for new period
+                    // The closing stock from previous period becomes opening stock for this period
                     if ($prevClosing && $prevClosing['closing_stock'] !== null) {
                         $openingStock = intval($prevClosing['closing_stock']);
-                    } else {
-                        // Fallback: get the previous period's opening stock if closing wasn't calculated
-                        $prevOpening = $db->fetch(
-                            "SELECT opening_stock FROM period_product_opening_stock 
-                             WHERE period_id = ? AND product_id = ?",
-                            [$previousPeriodId, $productId]
-                        );
-                        
-                        if ($prevOpening) {
-                            $openingStock = intval($prevOpening['opening_stock']);
-                        } else {
-                            // Last resort: use product's immutable opening stock
-                            $prod = ProductService::getProduct($productId);
-                            $openingStock = intval($prod['opening_stock'] ?? 0);
-                        }
                     }
-                    
-                    // Insert opening stock for new period
-                    $insertStmt = $db->getConnection()->prepare(
-                        "INSERT INTO period_product_opening_stock (period_id, product_id, opening_stock, closing_stock) 
-                         VALUES (?, ?, ?, ?)"
-                    );
-                    
-                    $insertStmt->bind_param('iiii', $period_id, $productId, $openingStock, $openingStock);
-                    
-                    if (!$insertStmt->execute()) {
-                        throw new Exception("Failed to set opening stock for product: " . $insertStmt->error);
-                    }
-                }
-            } else {
-                // No previous period - use immutable opening_stock for products
-                foreach ($products as $product) {
-                    $productId = $product['id'];
+                } else {
+                    // No previous period: Use product's immutable opening stock
                     $prod = ProductService::getProduct($productId);
                     $openingStock = intval($prod['opening_stock'] ?? 0);
-                    
-                    $insertStmt = $db->getConnection()->prepare(
-                        "INSERT INTO period_product_opening_stock (period_id, product_id, opening_stock, closing_stock) 
-                         VALUES (?, ?, ?, ?)"
-                    );
-                    
-                    $insertStmt->bind_param('iiii', $period_id, $productId, $openingStock, $openingStock);
-                    
-                    if (!$insertStmt->execute()) {
-                        throw new Exception("Failed to set opening stock for product: " . $insertStmt->error);
-                    }
+                }
+                
+                // Insert opening stock record for this period
+                $insertStmt = $db->getConnection()->prepare(
+                    "INSERT INTO period_product_opening_stock (period_id, product_id, opening_stock, closing_stock) 
+                     VALUES (?, ?, ?, ?)"
+                );
+                
+                $insertStmt->bind_param('iiii', $period_id, $productId, $openingStock, $openingStock);
+                
+                if (!$insertStmt->execute()) {
+                    throw new Exception("Failed to set opening stock for product: " . $insertStmt->error);
                 }
             }
             
