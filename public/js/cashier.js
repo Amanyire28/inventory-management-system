@@ -588,9 +588,9 @@ async function loadCurrentUser() {
         }
 
         // Update header
-        const userNameEl = document.getElementById('currentUserName');
+        const userNameEl = document.getElementById('currentUser');
         if (userNameEl) {
-            userNameEl.textContent = `Logged in as: ${data.data.user.full_name || data.data.user.username}`;
+            userNameEl.textContent = `${data.data.user.full_name || data.data.user.username}`;
         }
 
         // Update today's summary
@@ -601,12 +601,14 @@ async function loadCurrentUser() {
 }
 
 function updateTodaySummary(todayStats) {
-    const revenueEl = document.getElementById('todayRevenue');
-    const transactionsEl = document.getElementById('todayTransactions');
+    const revenueEl = document.getElementById('totalRevenue');
+    const transactionsEl = document.getElementById('totalTransactions');
     
     if (revenueEl && todayStats) {
         revenueEl.textContent = `UGX ${safeNumber(todayStats.sales_revenue).toFixed(0)}`;
-        transactionsEl.textContent = `${todayStats.transaction_count || 0} transactions`;
+    }
+    if (transactionsEl && todayStats) {
+        transactionsEl.textContent = `${todayStats.transaction_count || 0}`;
     }
 }
 
