@@ -994,21 +994,25 @@ async function loadAuditLog() {
         }
 
         const transactions = data.data.transactions || [];
-        const tbody = document.getElementById('auditLogBody');
+        const tbody = document.getElementById('auditTableBody');
         
         if (transactions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No transactions found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No transactions found</td></tr>';
             return;
         }
 
         tbody.innerHTML = transactions.map(t => `
             <tr>
-                <td>${t.id}</td>
                 <td>${formatDateTime(t.transaction_date || t.created_at)}</td>
+                <td>${t.created_by_name || 'System'}</td>
                 <td><span class="badge badge-${getBadgeClass(t.type)}">${t.type}</span></td>
-                <td>${t.product_name || 'N/A'}</td>
-                <td>${t.quantity > 0 ? '+' : ''}${t.quantity}</td>
-                <td>${t.notes || '-'}</td>
+                <td>${t.id}</td>
+                <td>${t.product_name || 'N/A'} (${t.quantity > 0 ? '+' : ''}${t.quantity} @ UGX ${safeNumber(t.unit_price).toFixed(0)})</td>
+                <td>-</td>
+                <td><span class="badge badge-${t.status === 'COMMITTED' ? 'success' : t.status === 'REVERSED' ? 'danger' : 'warning'}">${t.status}</span></td>
+                <td>
+                    ${t.reference_transaction_id ? `<small>Ref: ${t.reference_transaction_id}</small>` : '-'}
+                </td>
             </tr>
         `).join('');
 
@@ -1172,8 +1176,8 @@ function displayDailyReport(reportData) {
                                 <td><span class="badge badge-${getBadgeClass(t.type)}">${t.type}</span></td>
                                 <td>${t.product_name || 'N/A'}</td>
                                 <td>${t.quantity > 0 ? '+' : ''}${t.quantity}</td>
-                                <td>${t.amount ? 'UGX ' + safeNumber(t.amount).toFixed(0) : '-'}</td>
-                                <td>${t.notes || '-'}</td>
+                                <td>UGX ${safeNumber(t.total_amount).toFixed(0)}</td>
+                                <td>${t.reversal_reason || (t.is_backdated ? `Backdated (${t.days_late} days)` : '-')}</td>
                             </tr>
                         `).join('')}
                     </tbody>
