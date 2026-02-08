@@ -583,53 +583,84 @@ $router->add('GET', '/dashboard', function() {
                 break;
                 
             case 'metrics':
-                $today = date('Y-m-d');
-                $todayStart = $today . ' 00:00:00';
-                $todayEnd = $today . ' 23:59:59';
+                // Get current OPEN period
+                $periodQuery = "SELECT id, start_date, end_date FROM periods WHERE status = 'OPEN' LIMIT 1";
+                $currentPeriod = $db->fetch($periodQuery);
                 
-                // Sales revenue for today
+                if (!$currentPeriod) {
+                    // No open period - return zero metrics
+                    Response::success([
+                        'period' => null,
+                        'sales' => [
+                            'revenue' => 0,
+                            'transaction_count' => 0
+                        ],
+                        'purchases' => [
+                            'amount' => 0,
+                            'purchase_count' => 0
+                        ],
+                        'voids' => [
+                            'units' => 0,
+                            'void_count' => 0
+                        ],
+                        'adjustments' => [
+                            'count' => 0,
+                            'total_variance' => 0
+                        ]
+                    ]);
+                    break;
+                }
+                
+                $periodId = $currentPeriod['id'];
+                
+                // Sales revenue for current period (filter ONLY by period_id)
                 $salesQuery = "SELECT 
                     COALESCE(SUM(total_amount), 0) as revenue,
                     COUNT(*) as transaction_count
                 FROM transactions 
                 WHERE type = 'SALE' 
                     AND status = 'COMMITTED'
-                    AND transaction_date BETWEEN ? AND ?";
+                    AND period_id = ?";
                 
-                $salesResult = $db->fetch($salesQuery, [$todayStart, $todayEnd]);
+                $salesResult = $db->fetch($salesQuery, [$periodId]);
                 
-                // Purchases for today
+                // Purchases for current period
                 $purchasesQuery = "SELECT 
                     COALESCE(SUM(total_amount), 0) as amount,
                     COUNT(*) as purchase_count
                 FROM transactions 
                 WHERE type = 'PURCHASE' 
                     AND status = 'COMMITTED'
-                    AND transaction_date BETWEEN ? AND ?";
+                    AND period_id = ?";
                 
-                $purchasesResult = $db->fetch($purchasesQuery, [$todayStart, $todayEnd]);
+                $purchasesResult = $db->fetch($purchasesQuery, [$periodId]);
                 
-                // Voided units for today
+                // Voided units for current period
                 $voidsQuery = "SELECT 
                     COALESCE(SUM(ABS(quantity)), 0) as voided_units,
                     COUNT(*) as void_count
                 FROM transactions 
                 WHERE type IN ('VOID', 'REVERSAL')
                     AND status = 'COMMITTED'
-                    AND transaction_date BETWEEN ? AND ?";
+                    AND period_id = ?";
                 
-                $voidsResult = $db->fetch($voidsQuery, [$todayStart, $todayEnd]);
+                $voidsResult = $db->fetch($voidsQuery, [$periodId]);
                 
-                // Adjustments for today
+                // Adjustments for current period
                 $adjustmentsQuery = "SELECT 
                     COUNT(*) as adjustment_count,
                     COALESCE(SUM(ABS(variance)), 0) as total_variance
                 FROM stock_adjustments 
-                WHERE DATE(created_at) = ?";
+                WHERE period_id = ?";
                 
-                $adjustmentsResult = $db->fetch($adjustmentsQuery, [$today]);
+                $adjustmentsResult = $db->fetch($adjustmentsQuery, [$periodId]);
                 
                 Response::success([
+                    'period' => [
+                        'id' => $currentPeriod['id'],
+                        'start_date' => $currentPeriod['start_date'],
+                        'end_date' => $currentPeriod['end_date']
+                    ],
                     'sales' => [
                         'revenue' => floatval($salesResult['revenue'] ?? 0),
                         'transaction_count' => intval($salesResult['transaction_count'] ?? 0)
@@ -683,6 +714,11 @@ $router->add('GET', '/dashboard', function() {
             case 'recent-transactions':
                 $limit = intval(Router::getParam('limit') ?? 20);
                 
+                // Get current OPEN period
+                $periodQuery = "SELECT id FROM periods WHERE status = 'OPEN' LIMIT 1";
+                $currentPeriod = $db->fetch($periodQuery);
+                
+                // Build query - filter by period if it exists
                 $query = "SELECT 
                     t.id,
                     t.type,
@@ -698,9 +734,17 @@ $router->add('GET', '/dashboard', function() {
                 FROM transactions t
                 JOIN products p ON t.product_id = p.id
                 JOIN users u ON t.created_by = u.id
-                WHERE t.status = 'COMMITTED'
-                ORDER BY t.transaction_date DESC
-                LIMIT ?";
+                WHERE t.status = 'COMMITTED'";
+                
+                if ($currentPeriod) {
+                    $query .= " AND t.period_id = " . intval($currentPeriod['id']);
+                } else {
+                    // No period - show empty list
+                    Response::success([]);
+                    break;
+                }
+                
+                $query .= " ORDER BY t.transaction_date DESC LIMIT ?";
                 
                 $transactions = $db->fetchAll($query, [$limit]);
                 
