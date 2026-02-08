@@ -1154,6 +1154,12 @@ async function savePurchase() {
         const token = sessionStorage.getItem('authToken');
         if (!token) throw new Error('No auth token');
         
+        // Validate period exists before allowing purchase
+        if (!currentPeriod || !currentPeriod.id) {
+            alert('⚠️ Cannot record purchase: No active period exists.\n\nPlease create an accounting period first.');
+            return;
+        }
+        
         const productId = document.getElementById('purchaseProductId').value;
         const quantity = parseInt(document.getElementById('purchaseQuantity').value);
         const costPrice = parseFloat(document.getElementById('purchaseCostPrice').value);
@@ -1180,7 +1186,7 @@ async function savePurchase() {
             quantity: quantity,
             cost_price: costPrice,
             supplier: supplier || 'N/A',
-            period_id: currentPeriod ? currentPeriod.id : 1
+            period_id: currentPeriod.id  // Use actual period id, not fallback
         };
         
         // Add transaction date if provided (backdating support)
