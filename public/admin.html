@@ -89,6 +89,15 @@
                 <!-- OVERVIEW SECTION -->
                 <section id="overview" class="section active">
                     <div class="section-content">
+                        <!-- NO PERIOD WARNING -->
+                        <div id="noPeriodAlert" style="display: none; margin-bottom: 20px; padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                            <strong style="color: #cc6600;">⚠️ No Active Period</strong>
+                            <p style="margin: 8px 0 0 0; color: #666;">
+                                You need to create an accounting period to start tracking inventory. 
+                                <a href="#" onclick="showSection('periods'); openNewPeriodForm(); return false;" style="color: #0066cc; text-decoration: none; font-weight: bold;">Create a period now →</a>
+                            </p>
+                        </div>
+
                         <!-- TODAY's SUMMARY -->
                         <div class="today-summary">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">

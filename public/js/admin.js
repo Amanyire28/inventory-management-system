@@ -1485,7 +1485,7 @@ async function getCurrentPeriod() {
 
         if (!response.ok) {
             console.warn('Period status endpoint failed');
-            setPeriodDefault('Check server');
+            setPeriodDefault('No active period');
             return;
         }
 
@@ -1498,6 +1498,7 @@ async function getCurrentPeriod() {
             // Update header display
             const periodNameEl = document.getElementById('currentPeriodName');
             const periodStatusEl = document.getElementById('currentPeriodStatus');
+            const noPeriodAlert = document.getElementById('noPeriodAlert');
             
             if (periodNameEl) {
                 periodNameEl.textContent = currentPeriod.period_name;
@@ -1505,6 +1506,11 @@ async function getCurrentPeriod() {
             if (periodStatusEl) {
                 periodStatusEl.textContent = currentPeriod.status;
                 periodStatusEl.className = 'badge ' + (currentPeriod.status === 'OPEN' ? 'badge-success' : 'badge-secondary');
+            }
+            
+            // Hide alert - period exists
+            if (noPeriodAlert) {
+                noPeriodAlert.style.display = 'none';
             }
         } else {
             setPeriodDefault('No active period');
@@ -1518,6 +1524,7 @@ async function getCurrentPeriod() {
 function setPeriodDefault(message) {
     const periodNameEl = document.getElementById('currentPeriodName');
     const periodStatusEl = document.getElementById('currentPeriodStatus');
+    const noPeriodAlert = document.getElementById('noPeriodAlert');
     
     if (periodNameEl) {
         periodNameEl.textContent = message;
@@ -1525,6 +1532,17 @@ function setPeriodDefault(message) {
     if (periodStatusEl) {
         periodStatusEl.textContent = '—';
         periodStatusEl.className = 'badge';
+    }
+    
+    // Show "No Period" alert if no active period
+    if (message === 'No active period' || message === 'No period' || message === 'Error') {
+        if (noPeriodAlert) {
+            noPeriodAlert.style.display = 'block';
+        }
+    } else {
+        if (noPeriodAlert) {
+            noPeriodAlert.style.display = 'none';
+        }
     }
 }
 
