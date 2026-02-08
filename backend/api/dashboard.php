@@ -56,11 +56,26 @@ switch ($action) {
  */
 function getMetrics($db, $user) {
     try {
-        $today = date('Y-m-d');
-        $todayStart = $today . ' 00:00:00';
-        $todayEnd = $today . ' 23:59:59';
+        // Get current OPEN period
+        $periodQuery = "SELECT id, start_date, end_date FROM periods WHERE status = 'OPEN' LIMIT 1";
+        $periodResult = $db->query($periodQuery);
+        $currentPeriod = $periodResult ? $periodResult->fetch_assoc() : null;
         
-        // Get sales revenue for today
+        // Define date range for filtering
+        if ($currentPeriod) {
+            // Filter by current period
+            $startDate = $currentPeriod['start_date'] ?: date('Y-m-01'); // Default to start of month
+            $endDate = $currentPeriod['end_date'] ?: date('Y-m-d 23:59:59'); // Default to today
+            $periodId = $currentPeriod['id'];
+        } else {
+            // No open period - show today's data only
+            $today = date('Y-m-d');
+            $startDate = $today . ' 00:00:00';
+            $endDate = $today . ' 23:59:59';
+            $periodId = null;
+        }
+        
+        // Get sales revenue for current period
         $salesQuery = "SELECT 
             COALESCE(SUM(total_amount), 0) as revenue,
             COUNT(*) as transaction_count
@@ -69,12 +84,21 @@ function getMetrics($db, $user) {
             AND status = 'COMMITTED'
             AND transaction_date BETWEEN ? AND ?";
         
+        // Add period filter if available
+        if ($periodId) {
+            $salesQuery .= " AND period_id = ?";
+        }
+        
         $stmt = $db->prepare($salesQuery);
-        $stmt->bind_param('ss', $todayStart, $todayEnd);
+        if ($periodId) {
+            $stmt->bind_param('ssi', $startDate, $endDate, $periodId);
+        } else {
+            $stmt->bind_param('ss', $startDate, $endDate);
+        }
         $stmt->execute();
         $salesResult = $stmt->get_result()->fetch_assoc();
         
-        // Get purchases for today
+        // Get purchases for current period
         $purchasesQuery = "SELECT 
             COALESCE(SUM(total_amount), 0) as amount,
             COUNT(*) as purchase_count
@@ -83,12 +107,20 @@ function getMetrics($db, $user) {
             AND status = 'COMMITTED'
             AND transaction_date BETWEEN ? AND ?";
         
+        if ($periodId) {
+            $purchasesQuery .= " AND period_id = ?";
+        }
+        
         $stmt = $db->prepare($purchasesQuery);
-        $stmt->bind_param('ss', $todayStart, $todayEnd);
+        if ($periodId) {
+            $stmt->bind_param('ssi', $startDate, $endDate, $periodId);
+        } else {
+            $stmt->bind_param('ss', $startDate, $endDate);
+        }
         $stmt->execute();
         $purchasesResult = $stmt->get_result()->fetch_assoc();
         
-        // Get voided units for today
+        // Get voided units for current period
         $voidsQuery = "SELECT 
             COALESCE(SUM(ABS(quantity)), 0) as voided_units,
             COUNT(*) as void_count
@@ -97,26 +129,48 @@ function getMetrics($db, $user) {
             AND status = 'COMMITTED'
             AND transaction_date BETWEEN ? AND ?";
         
+        if ($periodId) {
+            $voidsQuery .= " AND period_id = ?";
+        }
+        
         $stmt = $db->prepare($voidsQuery);
-        $stmt->bind_param('ss', $todayStart, $todayEnd);
+        if ($periodId) {
+            $stmt->bind_param('ssi', $startDate, $endDate, $periodId);
+        } else {
+            $stmt->bind_param('ss', $startDate, $endDate);
+        }
         $stmt->execute();
         $voidsResult = $stmt->get_result()->fetch_assoc();
         
-        // Get adjustments for today
+        // Get adjustments for current period
+        $today = date('Y-m-d');
         $adjustmentsQuery = "SELECT 
             COUNT(*) as adjustment_count,
             COALESCE(SUM(ABS(variance)), 0) as total_variance
         FROM stock_adjustments 
-        WHERE DATE(created_at) = ?";
+        WHERE created_at BETWEEN ? AND ?";
+        
+        if ($periodId) {
+            $adjustmentsQuery .= " AND period_id = ?";
+        }
         
         $stmt = $db->prepare($adjustmentsQuery);
-        $stmt->bind_param('s', $today);
+        if ($periodId) {
+            $stmt->bind_param('ssi', $startDate, $endDate, $periodId);
+        } else {
+            $stmt->bind_param('ss', $startDate, $endDate);
+        }
         $stmt->execute();
         $adjustmentsResult = $stmt->get_result()->fetch_assoc();
         
         echo json_encode([
             'success' => true,
             'data' => [
+                'period' => $currentPeriod ? [
+                    'id' => $currentPeriod['id'],
+                    'start_date' => $currentPeriod['start_date'],
+                    'end_date' => $currentPeriod['end_date']
+                ] : null,
                 'sales' => [
                     'revenue' => floatval($salesResult['revenue']),
                     'transaction_count' => intval($salesResult['transaction_count'])

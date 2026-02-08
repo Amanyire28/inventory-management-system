@@ -81,10 +81,9 @@ class PeriodService {
             // Get all active products
             $products = $db->fetchAll("SELECT id FROM products WHERE status = 'active'");
             
-            // Get previous period
+            // Get previous CLOSED period
             $previousPeriod = $db->fetch(
-                "SELECT id FROM periods WHERE status = 'CLOSED' AND id != ? ORDER BY id DESC LIMIT 1",
-                [$period_id]
+                "SELECT id FROM periods WHERE status = 'CLOSED' ORDER BY id DESC LIMIT 1"
             );
             
             if ($previousPeriod) {
@@ -94,19 +93,31 @@ class PeriodService {
                 foreach ($products as $product) {
                     $productId = $product['id'];
                     
-                    // Get closing stock from previous period
+                    // IMPORTANT: Get CLOSING stock from previous period
                     $prevClosing = $db->fetch(
                         "SELECT closing_stock FROM period_product_opening_stock 
                          WHERE period_id = ? AND product_id = ?",
                         [$previousPeriodId, $productId]
                     );
                     
-                    if ($prevClosing) {
-                        $openingStock = $prevClosing['closing_stock'];
+                    // Use previous period's closing stock as opening for new period
+                    if ($prevClosing && $prevClosing['closing_stock'] !== null) {
+                        $openingStock = intval($prevClosing['closing_stock']);
                     } else {
-                        // Fallback: calculate from product's immutable opening_stock
-                        $prod = ProductService::getProduct($productId);
-                        $openingStock = $prod['opening_stock'] ?? 0;
+                        // Fallback: get the previous period's opening stock if closing wasn't calculated
+                        $prevOpening = $db->fetch(
+                            "SELECT opening_stock FROM period_product_opening_stock 
+                             WHERE period_id = ? AND product_id = ?",
+                            [$previousPeriodId, $productId]
+                        );
+                        
+                        if ($prevOpening) {
+                            $openingStock = intval($prevOpening['opening_stock']);
+                        } else {
+                            // Last resort: use product's immutable opening stock
+                            $prod = ProductService::getProduct($productId);
+                            $openingStock = intval($prod['opening_stock'] ?? 0);
+                        }
                     }
                     
                     // Insert opening stock for new period
@@ -126,7 +137,7 @@ class PeriodService {
                 foreach ($products as $product) {
                     $productId = $product['id'];
                     $prod = ProductService::getProduct($productId);
-                    $openingStock = $prod['opening_stock'] ?? 0;
+                    $openingStock = intval($prod['opening_stock'] ?? 0);
                     
                     $insertStmt = $db->getConnection()->prepare(
                         "INSERT INTO period_product_opening_stock (period_id, product_id, opening_stock, closing_stock) 

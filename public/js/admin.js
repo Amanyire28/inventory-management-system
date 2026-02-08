@@ -21,15 +21,23 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Admin dashboard initializing...');
     console.log('🚀 API_BASE:', window.API_BASE);
     
-    // Load dashboard data
-    loadDashboardMetrics();
-    getCurrentPeriod();
-    
     // Show Overview section by default
     showSection('overview');
     
     // Initialize datetime inputs to now
     initializeDatetimeInputs();
+    
+    // Load dashboard data in parallel
+    Promise.all([
+        loadDashboardMetrics().catch(e => console.error('Metrics error:', e)),
+        getCurrentPeriod().catch(e => console.error('Period error:', e)),
+        loadAlerts().catch(e => console.error('Alerts error:', e)),
+        loadRecentTransactions().catch(e => console.error('Transactions error:', e))
+    ]).then(() => {
+        console.log('✓ Dashboard data loaded');
+    }).catch(err => {
+        console.error('Dashboard initialization error:', err);
+    });
     
     // Set up auto-refresh for dashboard (every 30 seconds)
     startDashboardAutoRefresh();
@@ -166,74 +174,99 @@ function showSection(sectionName) {
 async function loadDashboardMetrics() {
     try {
         const token = sessionStorage.getItem('authToken');
-        if (!token) throw new Error('No auth token');
+        if (!token) {
+            setDashboardDefaults('No auth token');
+            return;
+        }
 
         const response = await fetch(`${API_BASE}/dashboard?action=metrics`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
+        if (!response.ok) {
+            console.warn(`Dashboard API returned ${response.status}`);
+            setDashboardDefaults('No data available');
+            return;
+        }
+
         const data = await response.json();
 
-        if (!response.ok) {
-            throw new Error(data.message || 'Failed to load dashboard metrics');
+        if (!data || !data.data) {
+            setDashboardDefaults('Invalid response format');
+            return;
         }
 
         const metrics = data.data;
         
-        // Update Today's Summary - Revenue
-        const todayRevenueEl = document.getElementById('todayRevenue');
-        const todayTransactionsEl = document.getElementById('todayTransactions');
-        if (todayRevenueEl) {
-            todayRevenueEl.textContent = `UGX ${safeNumber(metrics.sales.revenue).toFixed(0)}`;
-        }
-        if (todayTransactionsEl) {
-            todayTransactionsEl.textContent = `${metrics.sales.transaction_count || 0} transactions`;
-        }
+        // Safely update Today's Summary
+        safeUpdateElement('todayRevenue', () => 
+            `UGX ${safeNumber(metrics?.sales?.revenue || 0).toFixed(0)}`
+        );
+        safeUpdateElement('todayTransactions', () => 
+            `${metrics?.sales?.transaction_count || 0} transactions`
+        );
+        safeUpdateElement('todayPurchases', () => 
+            `UGX ${safeNumber(metrics?.purchases?.amount || 0).toFixed(0)}`
+        );
+        safeUpdateElement('todayPurchasesCount', () => 
+            `${metrics?.purchases?.purchase_count || 0} purchases`
+        );
         
-        // Update Today's Summary - Purchases
-        const todayPurchasesEl = document.getElementById('todayPurchases');
-        const todayPurchasesCountEl = document.getElementById('todayPurchasesCount');
-        if (todayPurchasesEl) {
-            todayPurchasesEl.textContent = `UGX ${safeNumber(metrics.purchases.amount).toFixed(0)}`;
-        }
-        if (todayPurchasesCountEl) {
-            todayPurchasesCountEl.textContent = `${metrics.purchases.purchase_count || 0} purchases`;
-        }
+        // Safely update Key Metrics Cards
+        safeUpdateElement('metricSalesRevenue', () => 
+            `UGX ${safeNumber(metrics?.sales?.revenue || 0).toFixed(0)}`
+        );
+        safeUpdateElement('metricSalesCount', () => 
+            `${metrics?.sales?.transaction_count || 0} in period`
+        );
+        safeUpdateElement('metricPurchasesAmount', () => 
+            `UGX ${safeNumber(metrics?.purchases?.amount || 0).toFixed(0)}`
+        );
+        safeUpdateElement('metricPurchasesCount', () => 
+            `${metrics?.purchases?.purchase_count || 0} in period`
+        );
+        safeUpdateElement('metricVoidedUnits', () => 
+            `${metrics?.voids?.units || 0}`
+        );
+        safeUpdateElement('metricVoidedCount', () => 
+            `${metrics?.voids?.void_count || 0} voids`
+        );
         
-        // Update Key Metrics Cards
-        const salesRevenueEl = document.getElementById('metricSalesRevenue');
-        const salesCountEl = document.getElementById('metricSalesCount');
-        if (salesRevenueEl) {
-            salesRevenueEl.textContent = `UGX ${safeNumber(metrics.sales.revenue).toFixed(0)}`;
-        }
-        if (salesCountEl) {
-            salesCountEl.textContent = `${metrics.sales.transaction_count} sales today`;
-        }
-        
-        const purchasesAmountEl = document.getElementById('metricPurchasesAmount');
-        const purchasesCountEl = document.getElementById('metricPurchasesCount');
-        if (purchasesAmountEl) {
-            purchasesAmountEl.textContent = `UGX ${safeNumber(metrics.purchases.amount).toFixed(0)}`;
-        }
-        if (purchasesCountEl) {
-            purchasesCountEl.textContent = `${metrics.purchases.purchase_count} purchases today`;
-        }
-        
-        const voidedUnitsEl = document.getElementById('metricVoidedUnits');
-        const voidedCountEl = document.getElementById('metricVoidedCount');
-        if (voidedUnitsEl) {
-            voidedUnitsEl.textContent = metrics.voids.units || 0;
-        }
-        if (voidedCountEl) {
-            voidedCountEl.textContent = `${metrics.voids.void_count} voids`;
-        }
-        
-        // Load product count and low stock count separately
+        // Load product metrics separately
         await loadProductMetrics(token);
 
         console.log('✓ Dashboard metrics loaded');
     } catch (error) {
         console.error('Failed to load dashboard metrics:', error);
+        setDashboardDefaults('Error loading data');
+    }
+}
+
+function setDashboardDefaults(message) {
+    const elements = [
+        'todayRevenue', 'todayTransactions', 'todayPurchases', 'todayPurchasesCount',
+        'metricSalesRevenue', 'metricSalesCount', 'metricPurchasesAmount', 'metricPurchasesCount',
+        'metricVoidedUnits', 'metricVoidedCount', 'metricLowStock', 'metricLowStockText'
+    ];
+    
+    elements.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.textContent = el.textContent.includes('UGX') ? 'UGX 0' : '0';
+        }
+    });
+    
+    console.warn(`Dashboard defaults set: ${message}`);
+}
+
+function safeUpdateElement(elementId, fn) {
+    try {
+        const el = document.getElementById(elementId);
+        if (el) {
+            el.textContent = fn();
+        }
+    } catch (error) {
+        console.error(`Error updating element ${elementId}:`, error);
     }
 }
 
@@ -339,22 +372,32 @@ async function loadAlerts() {
 }
 
 async function loadRecentTransactions() {
+    const tbody = document.getElementById('recentTransactionsBody');
+    if (!tbody) return;
+
     try {
         const token = sessionStorage.getItem('authToken');
-        if (!token) throw new Error('No auth token');
+        if (!token) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">Not authenticated</td></tr>';
+            return;
+        }
 
         const response = await fetch(`${API_BASE}/dashboard?action=recent-transactions&limit=10`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        const data = await response.json();
-
         if (!response.ok) {
-            throw new Error(data.message || 'Failed to load transactions');
+            console.warn('Recent transactions API failed');
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No recent transactions</td></tr>';
+            return;
         }
 
-        const tbody = document.getElementById('recentTransactionsBody');
-        if (!tbody) return;
+        const data = await response.json();
+
+        if (!data || !data.data) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No recent transactions</td></tr>';
+            return;
+        }
 
         const transactions = data.data;
 
@@ -362,7 +405,7 @@ async function loadRecentTransactions() {
         tbody.innerHTML = '';
 
         if (transactions.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="no-data">No recent transactions</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No recent transactions</td></tr>';
             return;
         }
 
@@ -411,10 +454,7 @@ async function loadRecentTransactions() {
         console.log('✓ Recent transactions loaded:', transactions.length);
     } catch (error) {
         console.error('Failed to load recent transactions:', error);
-        const tbody = document.getElementById('recentTransactionsBody');
-        if (tbody) {
-            tbody.innerHTML = '<tr><td colspan="6" class="error">Failed to load transactions</td></tr>';
-        }
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">Failed to load transactions</td></tr>';
     }
 }
 
@@ -1434,11 +1474,20 @@ async function loadPeriodsTable() {
 async function getCurrentPeriod() {
     try {
         const token = sessionStorage.getItem('authToken');
-        if (!token) return;
+        if (!token) {
+            setPeriodDefault('No period');
+            return;
+        }
 
         const response = await fetch(`${API_BASE}/dashboard?action=period-status`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
+
+        if (!response.ok) {
+            console.warn('Period status endpoint failed');
+            setPeriodDefault('Check server');
+            return;
+        }
 
         const data = await response.json();
 
@@ -1455,16 +1504,27 @@ async function getCurrentPeriod() {
             }
             if (periodStatusEl) {
                 periodStatusEl.textContent = currentPeriod.status;
-                periodStatusEl.className = 'badge ' + (currentPeriod.status === 'active' ? 'badge-success' : 'badge-secondary');
+                periodStatusEl.className = 'badge ' + (currentPeriod.status === 'OPEN' ? 'badge-success' : 'badge-secondary');
             }
+        } else {
+            setPeriodDefault('No active period');
         }
     } catch (error) {
         console.error('Failed to load current period:', error);
-        // Show error state in header
-        const periodNameEl = document.getElementById('currentPeriodName');
-        if (periodNameEl) {
-            periodNameEl.textContent = 'Error loading period';
-        }
+        setPeriodDefault('Error');
+    }
+}
+
+function setPeriodDefault(message) {
+    const periodNameEl = document.getElementById('currentPeriodName');
+    const periodStatusEl = document.getElementById('currentPeriodStatus');
+    
+    if (periodNameEl) {
+        periodNameEl.textContent = message;
+    }
+    if (periodStatusEl) {
+        periodStatusEl.textContent = '—';
+        periodStatusEl.className = 'badge';
     }
 }
 
