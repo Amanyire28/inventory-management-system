@@ -246,19 +246,20 @@ class ReportService {
         $productMovements = $db->fetchAll(
             "SELECT p.id as product_id,
                     p.name as product_name,
-                    p.opening_stock,
+                    ppos.opening_stock,
                     COALESCE(SUM(CASE WHEN t.type = 'PURCHASE' THEN t.quantity ELSE 0 END), 0) as purchases,
                     COALESCE(ABS(SUM(CASE WHEN t.type = 'SALE' THEN t.quantity ELSE 0 END)), 0) as sales,
                     COALESCE(SUM(CASE WHEN t.type = 'ADJUSTMENT' THEN t.quantity ELSE 0 END), 0) as adjustments,
-                    p.current_stock as closing_stock
+                    ppos.closing_stock
              FROM products p
+             LEFT JOIN period_product_opening_stock ppos ON p.id = ppos.product_id AND ppos.period_id = ?
              LEFT JOIN transactions t ON p.id = t.product_id 
                 AND t.period_id = ? 
                 AND t.status = 'COMMITTED'
-             GROUP BY p.id, p.name, p.opening_stock, p.current_stock
+             GROUP BY p.id, p.name, ppos.opening_stock, ppos.closing_stock
              HAVING purchases > 0 OR sales > 0 OR adjustments != 0
              ORDER BY p.name ASC",
-            [$period_id]
+            [$period_id, $period_id]
         );
         
         // Get all transactions in this period
