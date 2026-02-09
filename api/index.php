@@ -51,6 +51,7 @@ require_once __DIR__ . '/../backend/services/ProductService.php';
 require_once __DIR__ . '/../backend/services/PeriodService.php';
 require_once __DIR__ . '/../backend/services/StockTakingService.php';
 require_once __DIR__ . '/../backend/services/ReportService.php';
+require_once __DIR__ . '/../backend/services/UserService.php';
 
 // Initialize router
 $router = new Router();
@@ -76,6 +77,113 @@ $router->add('POST', '/auth/login', function() {
     }
     
     Response::success($result, 'Login successful');
+});
+
+// ==========================================
+// USER MANAGEMENT
+// ==========================================
+
+$router->add('GET', '/users', function() {
+    try {
+        $status = Router::getParam('status') ?: 'all';
+        $users = UserService::getAllUsers($status);
+        Response::success(['users' => $users]);
+    } catch (Exception $e) {
+        Response::error($e->getMessage());
+    }
+});
+
+$router->add('GET', '/users/:id', function() {
+    try {
+        $id = Router::getIdFromPath();
+        $user = UserService::getUser($id);
+        
+        if (!$user) {
+            Response::notFound('User not found');
+        }
+        
+        Response::success(['user' => $user]);
+    } catch (Exception $e) {
+        Response::error($e->getMessage());
+    }
+});
+
+$router->add('POST', '/users', function() {
+    try {
+        $body = Router::getBody();
+        
+        if (empty($body['username']) || empty($body['full_name']) || empty($body['password']) || empty($body['role'])) {
+            Response::validation([
+                'username' => 'Username is required',
+                'full_name' => 'Full name is required',
+                'password' => 'Password is required',
+                'role' => 'Role is required'
+            ]);
+        }
+        
+        $user = UserService::createUser(
+            $body['username'],
+            $body['full_name'],
+            $body['password'],
+            $body['role']
+        );
+        
+        Response::success($user, 'User created successfully', 201);
+    } catch (Exception $e) {
+        Response::error($e->getMessage());
+    }
+});
+
+$router->add('PUT', '/users/:id', function() {
+    try {
+        $id = Router::getIdFromPath();
+        $body = Router::getBody();
+        
+        if (empty($body['full_name']) || empty($body['role']) || empty($body['status'])) {
+            Response::validation([
+                'full_name' => 'Full name is required',
+                'role' => 'Role is required',
+                'status' => 'Status is required'
+            ]);
+        }
+        
+        $user = UserService::updateUser(
+            $id,
+            $body['full_name'],
+            $body['role'],
+            $body['status']
+        );
+        
+        Response::success($user, 'User updated successfully');
+    } catch (Exception $e) {
+        Response::error($e->getMessage());
+    }
+});
+
+$router->add('DELETE', '/users/:id', function() {
+    try {
+        $id = Router::getIdFromPath();
+        $result = UserService::deleteUser($id);
+        Response::success($result, 'User deleted successfully');
+    } catch (Exception $e) {
+        Response::error($e->getMessage());
+    }
+});
+
+$router->add('POST', '/users/:id/reset-password', function() {
+    try {
+        $id = Router::getIdFromPath();
+        $body = Router::getBody();
+        
+        if (empty($body['new_password'])) {
+            Response::validation(['new_password' => 'New password is required']);
+        }
+        
+        $result = UserService::resetPassword($id, $body['new_password']);
+        Response::success($result, 'Password reset successfully');
+    } catch (Exception $e) {
+        Response::error($e->getMessage());
+    }
 });
 
 // ==========================================

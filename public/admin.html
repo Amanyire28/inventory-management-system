@@ -45,6 +45,10 @@
                     <span class="icon">🔍</span>
                     <span>Audit Log</span>
                 </a>
+                <a href="#users" class="nav-item" onclick="showSection('users'); return false;">
+                    <span class="icon">👥</span>
+                    <span>User Mgmt</span>
+                </a>
                 <a href="#reports" class="nav-item" onclick="showSection('reports'); return false;">
                     <span class="icon">📊</span>
                     <span>Reports</span>
@@ -415,18 +419,19 @@
                                     <thead>
                                         <tr>
                                             <th>Product</th>
-                                            <th style="text-align: center;">Opening Stock</th>
+                                            <th style="text-align: center;">Opening</th>
                                             <th style="text-align: center;">Purchases</th>
                                             <th style="text-align: center;">Sales</th>
                                             <th style="text-align: center;">Adjustments</th>
-                                            <th style="text-align: center;">Calculated Closing</th>
-                                            <th style="text-align: center;">Actual Closing</th>
+                                            <th style="text-align: center;">Calculated</th>
+                                            <th style="text-align: center;">Actual</th>
+                                            <th style="text-align: center;">Variance</th>
                                             <th style="text-align: center;">Value (Cost)</th>
                                         </tr>
                                     </thead>
                                     <tbody id="previewProductsBody">
                                         <tr>
-                                            <td colspan="8" class="text-center">Loading products...</td>
+                                            <td colspan="9" class="text-center">Loading products...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -471,6 +476,50 @@
                             <tbody id="auditTableBody">
                                 <tr class="loading">
                                     <td colspan="8" class="text-center">Loading audit log...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- USER MANAGEMENT SECTION -->
+                <section id="users" class="section">
+                    <div class="section-content">
+                        <div class="section-header">
+                            <h2>User Management</h2>
+                            <div class="actions">
+                                <button class="btn btn-primary" onclick="openAddUserForm()">+ ADD USER</button>
+                            </div>
+                        </div>
+
+                        <div class="filters">
+                            <select id="userStatusFilter" onchange="loadUsersTable()">
+                                <option value="all">All Status</option>
+                                <option value="active">Active</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                            <select id="userRoleFilter" onchange="loadUsersTable()">
+                                <option value="all">All Roles</option>
+                                <option value="admin">Admin</option>
+                                <option value="cashier">Cashier</option>
+                            </select>
+                        </div>
+
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Last Login</th>
+                                    <th>Created</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <tr class="loading">
+                                    <td colspan="7" class="text-center">Loading users...</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -686,6 +735,90 @@ Fanta Orange 500ml,80,2000,1500,20
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('reverseSaleModal')">Cancel</button>
                 <button type="button" class="btn btn-danger" onclick="confirmReverseSale()">Reverse Sale</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit User Modal -->
+    <div id="userFormModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="userFormModalTitle">Add New User</h2>
+                <button type="button" class="modal-close" onclick="closeModal('userFormModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm" onsubmit="submitUserForm(event)">
+                    <input type="hidden" id="userId" value="">
+                    
+                    <div class="form-group">
+                        <label>Username *</label>
+                        <input type="text" id="userUsername" placeholder="Enter username" required minlength="3">
+                        <small>Minimum 3 characters, will be used for login</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Full Name *</label>
+                        <input type="text" id="userFullName" placeholder="Enter full name" required>
+                    </div>
+                    
+                    <div class="form-group" id="passwordGroup">
+                        <label>Password *</label>
+                        <input type="password" id="userPassword" placeholder="Enter password" minlength="6">
+                        <small>Minimum 6 characters</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Role *</label>
+                        <select id="userRole" required>
+                            <option value="">Select role</option>
+                            <option value="admin">Admin</option>
+                            <option value="cashier">Cashier</option>
+                        </select>
+                        <small>Admin: Full access. Cashier: Sales only</small>
+                    </div>
+                    
+                    <div class="form-group" id="statusGroup" style="display: none;">
+                        <label>Status *</label>
+                        <select id="userStatus">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('userFormModal')">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitUserForm(event)">Save User</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div id="resetPasswordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Reset User Password</h2>
+                <button type="button" class="modal-close" onclick="closeModal('resetPasswordModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong>ℹ️ Note:</strong> The user will need to use this new password to login.
+                </div>
+                <input type="hidden" id="resetPasswordUserId" value="">
+                <div id="resetPasswordUserInfo" style="margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 4px;"></div>
+                <div class="form-group">
+                    <label>New Password *</label>
+                    <input type="password" id="newPassword" placeholder="Enter new password" required minlength="6">
+                    <small>Minimum 6 characters</small>
+                </div>
+                <div class="form-group">
+                    <label>Confirm Password *</label>
+                    <input type="password" id="confirmPassword" placeholder="Confirm new password" required minlength="6">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('resetPasswordModal')">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="confirmResetPassword()">Reset Password</button>
             </div>
         </div>
     </div>

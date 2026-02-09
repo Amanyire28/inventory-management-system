@@ -379,6 +379,21 @@ html, body {
     background-color: #059669;
 }
 
+.btn-info {
+    background-color: #0ea5e9;
+    color: white;
+}
+
+.btn-info:hover:not(:disabled) {
+    background-color: #0284c7;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: 4px;
+}
+
 .btn-outline {
     background-color: transparent;
     color: var(--primary-color);
@@ -726,6 +741,21 @@ table tbody tr.loading td {
 .badge-closed {
     background-color: #e5e7eb;
     color: #374151;
+}
+
+.badge-success {
+    background-color: #d1fae5;
+    color: #065f46;
+}
+
+.badge-info {
+    background-color: #dbeafe;
+    color: #1e40af;
+}
+
+.badge-inactive {
+    background-color: #fee2e2;
+    color: #991b1b;
 }
 
 .stock-badge {

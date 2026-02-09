@@ -15,6 +15,66 @@ let currentReversalSaleId = null;
 let dashboardRefreshInterval = null;
 
 // ============================================
+// TOAST NOTIFICATION SYSTEM
+// ============================================
+function createToastContainer() {
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+    return container;
+}
+
+function showToast(title, message, type = 'info', duration = 5000) {
+    const container = createToastContainer();
+    
+    const icons = {
+        error: '❌',
+        warning: '⚠️',
+        success: '✅',
+        info: 'ℹ️'
+    };
+    
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || icons.info}</span>
+        <div class="toast-content">
+            <div class="toast-title">${title}</div>
+            <p class="toast-message">${message}</p>
+        </div>
+        <button class="toast-close" onclick="closeToast(this)">×</button>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Auto-remove after duration
+    if (duration > 0) {
+        setTimeout(() => {
+            closeToast(toast.querySelector('.toast-close'));
+        }, duration);
+    }
+}
+
+function closeToast(buttonElement) {
+    const toast = buttonElement.closest('.toast');
+    if (toast) {
+        toast.classList.add('hiding');
+        setTimeout(() => {
+            toast.remove();
+            // Remove container if empty
+            const container = document.getElementById('toastContainer');
+            if (container && container.children.length === 0) {
+                container.remove();
+            }
+        }, 300);
+    }
+}
+
+// ============================================
 // INITIALIZATION
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
@@ -159,6 +219,9 @@ function showSection(sectionName) {
             break;
         case 'audit':
             loadAuditLog();
+            break;
+        case 'users':
+            loadUsersTable();
             break;
         case 'reports':
             loadAvailablePeriods();
@@ -322,6 +385,20 @@ async function loadAlerts() {
         // Clear loading message
         container.innerHTML = '';
 
+        // Show toast notifications for out-of-stock products
+        if (alerts.out_of_stock.length > 0) {
+            const count = alerts.out_of_stock.length;
+            const productNames = alerts.out_of_stock.slice(0, 3).map(p => p.name).join(', ');
+            const suffix = alerts.out_of_stock.length > 3 ? `, and ${alerts.out_of_stock.length - 3} more` : '';
+            
+            showToast(
+                '⚠️ Products Out of Stock!',
+                `${count} product${count > 1 ? 's' : ''} need immediate attention: ${productNames}${suffix}`,
+                'error',
+                8000
+            );
+        }
+
         // Check if there are any alerts
         if (alerts.low_stock.length === 0 && alerts.out_of_stock.length === 0) {
             container.innerHTML = '<p class="no-alerts">✓ All products are well stocked</p>';
@@ -330,34 +407,53 @@ async function loadAlerts() {
 
         let html = '';
 
-        // Out of stock alerts (critical)
+        // Out of stock section (separate and prominent)
         if (alerts.out_of_stock.length > 0) {
+            html += `
+                <div class="out-of-stock-section">
+                    <h3>
+                        <span style="font-size: 20px;">🚨</span>
+                        Out of Stock Products (${alerts.out_of_stock.length})
+                    </h3>
+                    <p style="margin: 0 0 12px 0; font-size: 14px; color: #721c24;">
+                        These products require immediate restocking to avoid lost sales.
+                    </p>
+                    <div class="out-of-stock-products">
+            `;
+            
             alerts.out_of_stock.forEach(product => {
                 html += `
-                    <div class="alert alert-critical">
-                        <span class="alert-icon">⚠️</span>
-                        <div class="alert-content">
-                            <strong>${product.product_name}</strong>
-                            <p>OUT OF STOCK - Immediate restock required</p>
-                        </div>
+                    <div class="out-of-stock-item">
+                        <strong>${product.name}</strong>
+                        <span>Code: ${product.code || 'N/A'}</span><br>
+                        <span style="color: #dc3545; font-weight: 600;">STOCK: 0 units</span>
                     </div>
                 `;
             });
+            
+            html += `
+                    </div>
+                </div>
+            `;
         }
 
         // Low stock alerts (warning)
         if (alerts.low_stock.length > 0) {
+            html += `<div style="margin-top: 24px;"><h3 style="font-size: 16px; margin-bottom: 12px;">⚡ Low Stock Products (${alerts.low_stock.length})</h3><div class="alerts-container">`;
+            
             alerts.low_stock.forEach(product => {
                 html += `
                     <div class="alert alert-warning">
                         <span class="alert-icon">⚡</span>
                         <div class="alert-content">
-                            <strong>${product.product_name}</strong>
+                            <strong>${product.name}</strong>
                             <p>Low stock: ${product.current_stock} units (Reorder level: ${product.reorder_level})</p>
                         </div>
                     </div>
                 `;
             });
+            
+            html += `</div></div>`;
         }
 
         container.innerHTML = html;
@@ -1674,7 +1770,7 @@ async function openPeriodPreview(periodId) {
         // Product details
         const tbody = document.getElementById('previewProductsBody');
         if (products.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No products in this period</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center">No products in this period</td></tr>';
         } else {
             tbody.innerHTML = products.map(p => {
                 const openingStock = safeNumber(p.opening_stock, 0);
@@ -1684,8 +1780,11 @@ async function openPeriodPreview(periodId) {
                 const calculatedClosing = openingStock + purchases - sales + adjustments;
                 const actualClosing = safeNumber(p.closing_stock, 0);
                 const costValue = actualClosing * safeNumber(p.cost_price, 0);
-                const variance = calculatedClosing - actualClosing;
+                const variance = actualClosing - calculatedClosing; // Fixed: Variance = Actual - Calculated
 
+                const varianceColor = variance === 0 ? 'green' : (variance > 0 ? 'orange' : 'red');
+                const varianceText = variance === 0 ? '-' : (variance > 0 ? '+' + variance : variance);
+                
                 return `
                     <tr ${variance !== 0 ? 'style="background: #fff3cd;"' : ''}>
                         <td><strong>${p.product_name}</strong></td>
@@ -1695,6 +1794,7 @@ async function openPeriodPreview(periodId) {
                         <td style="text-align: center; color: orange;">${adjustments > 0 ? '+' : ''}${adjustments}</td>
                         <td style="text-align: center; font-weight: bold;">${calculatedClosing}</td>
                         <td style="text-align: center; font-weight: bold;">${actualClosing}</td>
+                        <td style="text-align: center; font-weight: bold; color: ${varianceColor};">${varianceText}</td>
                         <td style="text-align: right;">UGX ${costValue.toFixed(0).toLocaleString()}</td>
                     </tr>
                 `;
@@ -2505,5 +2605,282 @@ window.onclick = function(event) {
         event.target.classList.remove('active');
     }
 };
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+let currentUsers = [];
+
+async function loadUsersTable() {
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const statusFilter = document.getElementById('userStatusFilter')?.value || 'all';
+        
+        const response = await fetch(`${API_BASE}/users?status=${statusFilter}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to load users');
+        }
+
+        currentUsers = data.data.users || [];
+        
+        // Apply role filter if needed
+        const roleFilter = document.getElementById('userRoleFilter')?.value || 'all';
+        let filteredUsers = currentUsers;
+        if (roleFilter !== 'all') {
+            filteredUsers = currentUsers.filter(u => u.role === roleFilter);
+        }
+
+        const tbody = document.getElementById('usersTableBody');
+        
+        if (filteredUsers.length === 0) {
+            tbody.innerHTML = '<tr class="empty-state"><td colspan="7" class="text-center">No users found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = filteredUsers.map(user => `
+            <tr>
+                <td><strong>${user.username}</strong></td>
+                <td>${user.full_name}</td>
+                <td><span class="badge badge-${user.role === 'admin' ? 'success' : 'info'}">${user.role.toUpperCase()}</span></td>
+                <td><span class="badge badge-${user.status === 'active' ? 'active' : 'inactive'}">${user.status.toUpperCase()}</span></td>
+                <td>N/A</td>
+                <td>${formatDateTime(user.created_at)}</td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="openEditUserForm(${user.id})" title="Edit User">✏️ Edit</button>
+                    <button class="btn btn-sm btn-info" onclick="openResetPasswordModal(${user.id})" title="Reset Password">🔑 Reset</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id})" title="Delete User">🗑️ Delete</button>
+                </td>
+            </tr>
+        `).join('');
+
+        console.log(`✓ Loaded ${filteredUsers.length} users`);
+    } catch (error) {
+        console.error('Failed to load users:', error);
+        const tbody = document.getElementById('usersTableBody');
+        if (tbody) {
+            tbody.innerHTML = '<tr class="error"><td colspan="7" class="text-center">Failed to load users</td></tr>';
+        }
+    }
+}
+
+function openAddUserForm() {
+    // Reset form
+    document.getElementById('userForm').reset();
+    document.getElementById('userId').value = '';
+    document.getElementById('userFormModalTitle').textContent = 'Add New User';
+    
+    // Show password field for new user
+    document.getElementById('passwordGroup').style.display = 'block';
+    document.getElementById('userPassword').required = true;
+    
+    // Hide status field for new user
+    document.getElementById('statusGroup').style.display = 'none';
+    
+    // Enable username field
+    document.getElementById('userUsername').disabled = false;
+    
+    openModal('userFormModal');
+}
+
+function openEditUserForm(userId) {
+    const user = currentUsers.find(u => u.id === userId);
+    if (!user) {
+        alert('User not found');
+        return;
+    }
+    
+    // Populate form
+    document.getElementById('userId').value = user.id;
+    document.getElementById('userUsername').value = user.username;
+    document.getElementById('userFullName').value = user.full_name;
+    document.getElementById('userRole').value = user.role;
+    document.getElementById('userStatus').value = user.status;
+    
+    // Update modal title
+    document.getElementById('userFormModalTitle').textContent = 'Edit User';
+    
+    // Hide password field for editing
+    document.getElementById('passwordGroup').style.display = 'none';
+    document.getElementById('userPassword').required = false;
+    
+    // Show status field for editing
+    document.getElementById('statusGroup').style.display = 'block';
+    
+    // Disable username field
+    document.getElementById('userUsername').disabled = true;
+    
+    openModal('userFormModal');
+}
+
+async function submitUserForm(event) {
+    event?.preventDefault();
+    
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const userId = document.getElementById('userId').value;
+        const isEdit = userId !== '';
+        
+        const username = document.getElementById('userUsername').value.trim();
+        const fullName = document.getElementById('userFullName').value.trim();
+        const password = document.getElementById('userPassword').value;
+        const role = document.getElementById('userRole').value;
+        const status = document.getElementById('userStatus').value;
+        
+        // Validation
+        if (!username || !fullName || !role) {
+            alert('Please fill in all required fields');
+            return;
+        }
+        
+        if (!isEdit && (!password || password.length < 6)) {
+            alert('Password must be at least 6 characters');
+            return;
+        }
+        
+        let response;
+        
+        if (isEdit) {
+            // Update user
+            response = await fetch(`${API_BASE}/users/${userId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ full_name: fullName, role, status })
+            });
+        } else {
+            // Create new user
+            response = await fetch(`${API_BASE}/users`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, full_name: fullName, password, role })
+            });
+        }
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to save user');
+        }
+
+        alert(isEdit ? '✓ User updated successfully!' : '✓ User created successfully!');
+        closeModal('userFormModal');
+        await loadUsersTable();
+        
+    } catch (error) {
+        console.error('Failed to save user:', error);
+        alert('Error: ' + error.message);
+    }
+}
+
+async function deleteUser(userId) {
+    const user = currentUsers.find(u => u.id === userId);
+    if (!user) {
+        alert('User not found');
+        return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete user "${user.username}"?\n\nThis will deactivate their account and they will no longer be able to login.`)) {
+        return;
+    }
+    
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const response = await fetch(`${API_BASE}/users/${userId}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to delete user');
+        }
+
+        alert('✓ User deleted successfully!');
+        await loadUsersTable();
+        
+    } catch (error) {
+        console.error('Failed to delete user:', error);
+        alert('Error: ' + error.message);
+    }
+}
+
+function openResetPasswordModal(userId) {
+    const user = currentUsers.find(u => u.id === userId);
+    if (!user) {
+        alert('User not found');
+        return;
+    }
+    
+    document.getElementById('resetPasswordUserId').value = userId;
+    document.getElementById('resetPasswordUserInfo').innerHTML = `
+        <strong>User:</strong> ${user.username} (${user.full_name})<br>
+        <strong>Role:</strong> ${user.role.toUpperCase()}
+    `;
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    
+    openModal('resetPasswordModal');
+}
+
+async function confirmResetPassword() {
+    try {
+        const token = sessionStorage.getItem('authToken');
+        if (!token) throw new Error('No auth token');
+
+        const userId = document.getElementById('resetPasswordUserId').value;
+        const newPassword = document.getElementById('newPassword').value;
+        const confirmPassword = document.getElementById('confirmPassword').value;
+        
+        // Validation
+        if (!newPassword || newPassword.length < 6) {
+            alert('Password must be at least 6 characters');
+            return;
+        }
+        
+        if (newPassword !== confirmPassword) {
+            alert('Passwords do not match');
+            return;
+        }
+        
+        const response = await fetch(`${API_BASE}/users/${userId}/reset-password`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ new_password: newPassword })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Failed to reset password');
+        }
+
+        alert('✓ Password reset successfully!');
+        closeModal('resetPasswordModal');
+        
+    } catch (error) {
+        console.error('Failed to reset password:', error);
+        alert('Error: ' + error.message);
+    }
+}
 
 console.log('✓ Admin dashboard loaded');
