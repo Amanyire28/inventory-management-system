@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../classes/Product.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
@@ -21,6 +21,7 @@ $action = $_GET['action'] ?? null;
 $id = $_GET['id'] ?? null;
 
 try {
+    $conn = Database::getInstance()->getConnection();
     $product = new Product($conn);
     
     switch ($action) {

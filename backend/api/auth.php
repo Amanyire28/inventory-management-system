@@ -13,13 +13,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../classes/User.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? null;
 
 try {
+    $conn = Database::getInstance()->getConnection();
     $user = new User($conn);
     
     switch ($action) {

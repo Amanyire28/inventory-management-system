@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../core/Database.php';
 require_once __DIR__ . '/../utils/auth_middleware.php';
 
 // Verify authentication
@@ -33,7 +33,7 @@ if ($user['role'] !== 'admin') {
     exit();
 }
 
-$db = getDBConnection();
+$db = Database::getInstance()->getConnection();
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     getAuditLogs($db);
