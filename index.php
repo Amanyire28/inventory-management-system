@@ -64,13 +64,6 @@ if (isset($_GET['logout'], $_GET['token'])) {
                 <div id="loginError" class="alert alert-danger" style="display: none;"></div>
                 <div id="loginSuccess" class="alert alert-success" style="display: none;"></div>
             </form>
-
-            <div class="login-footer">
-                <p>System Status: <span class="status-online">🟢 Online</span></p>
-                <p>Demo Users:</p>
-                <small>Cashier: cashier1 / password</small><br>
-                <small>Admin: admin1 / password</small>
-            </div>
         </div>
     </div>
 
