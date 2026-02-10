@@ -111,7 +111,7 @@ if (isset($_GET['logout'], $_GET['token'])) {
     <div class="login-container">
         <div class="login-box" style="background: white !important;"> <!-- white form background as requested -->
             <div class="login-header">
-                <h1>TOPINV</h1>
+                <h1>TOP MEDICAL CLINIC</h1>
                 <p>Clinic Inventory Management System</p>
             </div>
 
