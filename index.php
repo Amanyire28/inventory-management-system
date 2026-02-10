@@ -16,8 +16,8 @@ if (isset($_GET['logout'], $_GET['token'])) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TOP INVENTORY MANAGEMENT - Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TOPINV - Login</title>
     <!-- Use absolute paths to ensure it works from root -->
     <link rel="stylesheet" href="/topinv/public/css/style.css">
     <style>
@@ -28,7 +28,82 @@ if (isset($_GET['logout'], $_GET['token'])) {
             justify-content: center;
             min-height: 100vh;
             margin: 0;
-            background-color: #e0f2fe; /* light blue background as requested */
+            background-color: #e0f2fe;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Mobile-specific login styles */
+        @media (max-width: 768px) {
+            body.login-page {
+                padding: 20px 0;
+                align-items: flex-start;
+            }
+
+            .login-container {
+                width: 100%;
+                max-width: 100%;
+                padding: 15px;
+                margin: auto 0;
+            }
+
+            .login-box {
+                padding: 30px 20px !important;
+                border-radius: 12px !important;
+                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
+            }
+
+            .login-header h1 {
+                font-size: 26px !important;
+            }
+
+            .login-header p {
+                font-size: 13px !important;
+            }
+
+            .form-group input {
+                font-size: 16px !important;
+                padding: 12px 14px !important;
+            }
+
+            .btn-block {
+                padding: 14px !important;
+                font-size: 16px !important;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body.login-page {
+                padding: 15px 0;
+            }
+
+            .login-container {
+                padding: 10px;
+            }
+
+            .login-box {
+                padding: 25px 15px !important;
+                border-radius: 10px !important;
+            }
+
+            .login-header h1 {
+                font-size: 22px !important;
+            }
+
+            .login-header p {
+                font-size: 12px !important;
+            }
+
+            .form-group {
+                margin-bottom: 18px !important;
+            }
+
+            .form-group label {
+                font-size: 13px !important;
+            }
         }
     </style>
 </head>
@@ -36,7 +111,7 @@ if (isset($_GET['logout'], $_GET['token'])) {
     <div class="login-container">
         <div class="login-box" style="background: white !important;"> <!-- white form background as requested -->
             <div class="login-header">
-                <h1>TOP INVENTORY MANAGEMENT</h1>
+                <h1>TOPINV</h1>
                 <p>Clinic Inventory Management System</p>
             </div>
 
