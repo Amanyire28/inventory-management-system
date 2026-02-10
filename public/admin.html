@@ -8,9 +8,17 @@
     <link rel="stylesheet" href="/topinv/public/css/admin.css">
 </head>
 <body class="admin-dashboard">
+    <!-- Mobile Menu Toggle -->
+    <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle Menu">
+        ☰
+    </button>
+    
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" onclick="closeMobileMenu()"></div>
+    
     <div class="dashboard-container">
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h2>TOP INVENTORY MANAGEMENT</h2>
                 <p class="user-role">Administrator</p>
@@ -826,6 +834,47 @@ Fanta Orange 500ml,80,2000,1500,20
     <!-- Core Scripts -->
     <script>
         window.API_BASE = '/topinv/api';
+
+        // Mobile Menu Toggle Functions
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.mobile-overlay');
+            sidebar.classList.toggle('mobile-open');
+            overlay.classList.toggle('active');
+        }
+
+        function closeMobileMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.mobile-overlay');
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+        }
+
+        // Close mobile menu when clicking nav items
+        document.addEventListener('DOMContentLoaded', function() {
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        closeMobileMenu();
+                    }
+                });
+            });
+
+            // Hide mobile menu toggle on desktop
+            function handleResize() {
+                const toggle = document.querySelector('.mobile-menu-toggle');
+                if (window.innerWidth > 768) {
+                    closeMobileMenu();
+                    toggle.style.display = 'none';
+                } else {
+                    toggle.style.display = 'block';
+                }
+            }
+
+            handleResize();
+            window.addEventListener('resize', handleResize);
+        });
     </script>
     <!-- PDF Generation Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>

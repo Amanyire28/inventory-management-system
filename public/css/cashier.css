@@ -846,3 +846,136 @@
         font-size: 10px;
     }
 }
+
+/* ============================================
+   ADDITIONAL MOBILE ENHANCEMENTS FOR CASHIER
+   ============================================ */
+
+@media (max-width: 768px) {
+    /* Transaction cards mobile optimization */
+    .transaction-cards-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .card-header {
+        padding: 12px;
+    }
+
+    .card-header h3 {
+        font-size: 14px;
+    }
+
+    .card-content {
+        padding: 15px;
+    }
+
+    /* Search and product selection */
+    .search-wrapper input {
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 12px;
+    }
+
+    .dropdown-list {
+        max-height: 250px;
+    }
+
+    .search-result-item {
+        padding: 12px;
+    }
+
+    /* Product info mobile */
+    .product-info-compact {
+        padding: 10px;
+        font-size: 13px;
+    }
+
+    /* Sale items table - better mobile view */
+    .sale-items-table {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .sale-items-table table {
+        min-width: 500px;
+    }
+
+    /* Summary mobile */
+    .sale-summary-compact {
+        padding: 12px;
+    }
+
+    /* Action buttons mobile */
+    .action-buttons {
+        position: sticky;
+        bottom: 0;
+        background: white;
+        padding: 12px;
+        margin: 0 -15px -15px;
+        border-top: 2px solid var(--border-gray);
+    }
+
+    /* Receipt modal mobile */
+    .receipt-modal .modal-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .receipt-content {
+        font-size: 12px;
+    }
+
+    /* Today summary mobile */
+    .summary-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .summary-stat-item {
+        padding: 15px;
+    }
+
+    /* My receipts table */
+    .receipts-table {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .receipts-table table {
+        min-width: 600px;
+    }
+}
+
+/* Extra small devices optimization */
+@media (max-width: 375px) {
+    .card-header h3 {
+        font-size: 13px;
+    }
+
+    .card-status {
+        font-size: 10px;
+        padding: 3px 8px;
+    }
+
+    .product-info-compact .info-row {
+        font-size: 12px;
+    }
+
+    .line-total-compact {
+        font-size: 13px;
+        padding: 10px;
+    }
+
+    .sale-summary-compact .summary-row {
+        font-size: 12px;
+    }
+
+    .sale-summary-compact .summary-row.total {
+        font-size: 15px;
+    }
+
+    .action-buttons .btn {
+        padding: 10px 12px;
+        font-size: 13px;
+        min-height: 42px;
+    }
+}
