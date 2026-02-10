@@ -17,7 +17,7 @@ if (isset($_GET['logout'], $_GET['token'])) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TOPINV - Login</title>
+    <title>TOP INVENTORY MANAGEMENT - Login</title>
     <!-- Use absolute paths to ensure it works from root -->
     <link rel="stylesheet" href="/topinv/public/css/style.css">
     <style>
@@ -36,7 +36,7 @@ if (isset($_GET['logout'], $_GET['token'])) {
     <div class="login-container">
         <div class="login-box" style="background: white !important;"> <!-- white form background as requested -->
             <div class="login-header">
-                <h1>TOPINV</h1>
+                <h1>TOP INVENTORY MANAGEMENT</h1>
                 <p>Clinic Inventory Management System</p>
             </div>
 
