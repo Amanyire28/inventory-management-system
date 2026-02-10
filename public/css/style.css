@@ -580,6 +580,11 @@ html, body {
     margin-bottom: 0;
 }
 
+/* Hide mobile logout nav item on desktop */
+.mobile-logout-nav {
+    display: none;
+}
+
 .main-content {
     flex: 1;
     display: flex;
@@ -1171,6 +1176,15 @@ table tbody tr.loading td {
     }
 
     .sidebar-footer {
+        display: none;
+    }
+
+    /* Show mobile logout as inline nav item */
+    .mobile-logout-nav {
+        display: flex !important;
+    }
+
+    .mobile-logout-nav span:not(.icon) {
         display: none;
     }
 
