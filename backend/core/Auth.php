@@ -17,7 +17,7 @@ class Auth {
     public static function login($username, $password) {
         $db = Database::getInstance()->getConnection();
         
-        $stmt = $db->prepare("SELECT id, username, full_name, role, status FROM users WHERE username = ? AND status = 'active'");
+        $stmt = $db->prepare("SELECT id, username, password_hash, full_name, role, status FROM users WHERE username = ? AND status = 'active'");
         $stmt->bind_param('s', $username);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -27,9 +27,8 @@ class Auth {
             return ['success' => false, 'message' => 'Invalid credentials'];
         }
         
-        // For demo: accept 'password' as valid password
-        // In production: use proper password hashing with bcrypt
-        if ($password !== 'password') {
+        // Verify password using password_verify
+        if (!password_verify($password, $user['password_hash'])) {
             return ['success' => false, 'message' => 'Invalid credentials'];
         }
         
