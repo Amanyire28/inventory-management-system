@@ -3,7 +3,7 @@
    ============================================ */
 
 // Ensure API_BASE is available
-const API_BASE = window.API_BASE || '/topinv/api';
+const API_BASE = window.API_BASE || '/api';
 
 function setupLoginForm() {
     const loginForm = document.getElementById('loginForm');
@@ -42,7 +42,7 @@ function setupLoginForm() {
                     showLoginSuccess('✓ Login successful! Redirecting...');
                     
                     // Redirect to dashboards in public folder
-                    const target = response.data.user.role === 'admin' ? '/topinv/public/admin.html' : '/topinv/public/cashier.html';
+                    const target = response.data.user.role === 'admin' ? './public/admin.html' : './public/cashier.html';
                     
                     setTimeout(() => {
                         window.location.href = target;

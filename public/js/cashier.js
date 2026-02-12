@@ -3,7 +3,7 @@
    ======================================== */
 
 // API Base URL
-const API_BASE = window.API_BASE || '/topinv/api';
+const API_BASE = window.API_BASE || '/api';
 
 // Global state for SALE
 let currentSale = {

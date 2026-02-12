@@ -1,6 +1,6 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /topinv/api/
+    # RewriteBase auto-detects the directory
     
     # Handle requests for real files or directories
     RewriteCond %{REQUEST_FILENAME} !-f

@@ -6,7 +6,7 @@
  */
 
 class Router {
-    private $basePath = '/topinv/api';
+    private $basePath;
     private $requestMethod;
     private $requestPath;
     private $endpoints = [];
@@ -17,8 +17,15 @@ class Router {
         $this->requestMethod = $_SERVER['REQUEST_METHOD'];
         $this->requestPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         
+        // Auto-detect base path (everything before and including /api)
+        if (strpos($this->requestPath, '/api') !== false) {
+            $this->basePath = substr($this->requestPath, 0, strpos($this->requestPath, '/api') + 4);
+        } else {
+            $this->basePath = '';
+        }
+        
         // Remove base path
-        if (strpos($this->requestPath, $this->basePath) === 0) {
+        if ($this->basePath && strpos($this->requestPath, $this->basePath) === 0) {
             $this->requestPath = substr($this->requestPath, strlen($this->basePath));
         }
         

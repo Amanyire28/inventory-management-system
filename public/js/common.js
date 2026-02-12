@@ -43,8 +43,8 @@ function logout() {
     if (confirm('Are you sure you want to logout?')) {
         sessionStorage.clear();
         localStorage.clear();
-        // Redirect to root login
-        window.location.href = '/topinv/';
+        // Redirect to root login (relative path works anywhere)
+        window.location.href = '../';
     }
 }
 
@@ -185,8 +185,8 @@ function initDashboard() {
     const token = sessionStorage.getItem('authToken');
     
     if (!userStr || !token) {
-        // Not authenticated - redirect to login
-        window.location.href = '/topinv/';
+        // Not authenticated - redirect to login (relative path)
+        window.location.href = '../';
         return;
     }
     

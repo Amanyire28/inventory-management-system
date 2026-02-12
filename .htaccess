@@ -1,17 +1,18 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    # RewriteBase auto-detects the directory
     
     # Don't rewrite actual files or directories
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     
     # Don't rewrite the api folder - it has its own router
-    RewriteCond %{REQUEST_URI} !^/topinv/api/
+    RewriteCond %{REQUEST_URI} !api/
     
     # Don't rewrite public static files
-    RewriteCond %{REQUEST_URI} !^/topinv/public/
-    RewriteCond %{REQUEST_URI} !^/topinv/backend/
+    RewriteCond %{REQUEST_URI} !public/
+    RewriteCond %{REQUEST_URI} !backend/
     
     # Route all other requests to index.php
-    RewriteRule ^(.*)$ /topinv/index.php [QSA,L]
+    RewriteRule ^(.*)$ index.php [QSA,L]
 </IfModule>

@@ -1,0 +1,16 @@
+<!-- Open this file in browser, it will clear the session and redirect to login -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Session</title>
+</head>
+<body>
+    <h2>Clearing session...</h2>
+    <script>
+        sessionStorage.clear();
+        localStorage.clear();
+        alert('Session cleared! Redirecting to login...');
+        window.location.href = './';
+    </script>
+</body>
+</html>

@@ -18,8 +18,8 @@ if (isset($_GET['logout'], $_GET['token'])) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>TOPINV - Login</title>
-    <!-- Use absolute paths to ensure it works from root -->
-    <link rel="stylesheet" href="/topinv/public/css/style.css">
+    <!-- Use relative paths for hosting compatibility -->
+    <link rel="stylesheet" href="public/css/style.css">
     <style>
         /* Ensure centering works even when loaded in root */
         body.login-page {
@@ -144,11 +144,11 @@ if (isset($_GET['logout'], $_GET['token'])) {
 
     <!-- Core Scripts -->
     <script>
-        // API Configuration
-        window.API_BASE = '/topinv/api';
+        // API Configuration - Relative path for any hosting environment
+        window.API_BASE = './api';
     </script>
-    <script src="/topinv/public/js/common.js"></script>
-    <script src="/topinv/public/js/auth.js"></script>
+    <script src="public/js/common.js"></script>
+    <script src="public/js/auth.js"></script>
 
     <script>
     // Auto-redirect if already logged in
@@ -158,7 +158,7 @@ if (isset($_GET['logout'], $_GET['token'])) {
         
         if (token && userStr) {
             const user = JSON.parse(userStr);
-            const target = user.role === 'admin' ? '/topinv/public/admin.html' : '/topinv/public/cashier.html';
+            const target = user.role === 'admin' ? './public/admin.html' : './public/cashier.html';
             window.location.href = target;
         }
     });
