@@ -64,6 +64,10 @@ class PeriodService {
                 throw new Exception("Cannot create new period. Period '{$openPeriod['period_name']}' is still OPEN. Please close it first.");
             }
             
+            // Convert empty strings to NULL for DATE fields (strict mode compatibility)
+            $start_date = !empty($start_date) ? $start_date : null;
+            $end_date = !empty($end_date) ? $end_date : null;
+            
             // Create the period
             $stmt = $db->getConnection()->prepare(
                 "INSERT INTO periods (period_name, status, start_date, end_date) 
