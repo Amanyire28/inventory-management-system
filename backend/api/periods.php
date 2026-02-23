@@ -194,9 +194,17 @@ function closePeriod($db, $user) {
             return;
         }
         
+        // Update closing_stock for all products in this period
+        $products = $db->query("SELECT id, current_stock FROM products WHERE status = 'active'");
+        $stmt = $db->prepare("UPDATE period_product_opening_stock SET closing_stock = ? WHERE product_id = ? AND period_id = ?");
+        while ($row = $products->fetch_assoc()) {
+            $stmt->bind_param('dii', $row['current_stock'], $row['id'], $periodId);
+            $stmt->execute();
+        }
+
         echo json_encode([
             'success' => true,
-            'message' => 'Period closed successfully'
+            'message' => 'Period closed successfully and closing stock saved.'
         ]);
     } catch (Exception $e) {
         http_response_code(500);

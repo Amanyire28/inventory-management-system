@@ -79,14 +79,15 @@ class UserService {
         $db->beginTransaction();
         
         try {
-            // For demo purposes, we're storing plain password
-            // In production, use password_hash()
+            // Hash the password using bcrypt
+            $password_hash = password_hash($password, PASSWORD_BCRYPT);
+            
             $stmt = $conn->prepare(
                 "INSERT INTO users (username, full_name, password_hash, role, status) 
                  VALUES (?, ?, ?, ?, 'active')"
             );
             
-            $stmt->bind_param('ssss', $username, $full_name, $password, $role);
+            $stmt->bind_param('ssss', $username, $full_name, $password_hash, $role);
             
             if (!$stmt->execute()) {
                 throw new Exception("Failed to create user: " . $stmt->error);
@@ -203,10 +204,11 @@ class UserService {
         $db->beginTransaction();
         
         try {
-            // For demo purposes, we're storing plain password
-            // In production, use password_hash()
+            // Hash the password using bcrypt
+            $password_hash = password_hash($new_password, PASSWORD_BCRYPT);
+            
             $stmt = $conn->prepare("UPDATE users SET password_hash = ? WHERE id = ?");
-            $stmt->bind_param('si', $new_password, $user_id);
+            $stmt->bind_param('si', $password_hash, $user_id);
             
             if (!$stmt->execute()) {
                 throw new Exception("Failed to reset password: " . $stmt->error);

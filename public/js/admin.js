@@ -2290,6 +2290,50 @@ async function generateStockReport() {
         }
         
         displayStockReport(data.data);
+        // Show the simple print button and attach handler
+        const btn = document.getElementById('btnSimpleStockValuation');
+        if (btn) {
+            btn.style.display = '';
+            btn.onclick = () => printSimpleStockValuationReport(data.data);
+        }
+    // Print Stock Valuation Report (Product, Opening, Purchases, Sales, Adjustments, Current Stock)
+    function printSimpleStockValuationReport(reportData) {
+        const products = reportData.products || [];
+        let html = `
+            <div class="report-header">
+                <h3>Stock Valuation Report (Simple)</h3>
+                <p>Generated: ${new Date().toLocaleString()}</p>
+            </div>
+            <div class="report-products">
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Opening</th>
+                            <th>Purchases</th>
+                            <th>Sales</th>
+                            <th>Adjustments</th>
+                            <th>Current Stock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${products.map(p => `
+                            <tr>
+                                <td>${p.name || 'Unknown'}</td>
+                                <td>${safeNumber(p.opening_stock, 0)}</td>
+                                <td style="color: green;">+${safeNumber(p.total_purchases, 0)}</td>
+                                <td style="color: red;">-${safeNumber(p.total_sales, 0)}</td>
+                                <td style="color: orange;">${safeNumber(p.total_adjustments, 0) >= 0 ? '+' : ''}${safeNumber(p.total_adjustments, 0)}</td>
+                                <td style="font-weight: bold;">${safeNumber(p.current_stock, 0)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+        const container = document.getElementById('stockReportContent');
+        container.innerHTML = html;
+    }
     } catch (error) {
         console.error('Failed to generate stock report:', error);
         alert('Failed to generate report: ' + error.message);
