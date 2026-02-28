@@ -13,6 +13,8 @@ let currentPeriod = null;
 let availablePeriods = [];
 let currentReversalSaleId = null;
 let dashboardRefreshInterval = null;
+// Last-loaded stock report data (for filtering/re-render)
+let lastStockReportData = null;
 
 // ============================================
 // TOAST NOTIFICATION SYSTEM
@@ -406,8 +408,6 @@ async function loadAlerts() {
         }
 
         let html = '';
-
-        // Out of stock section (separate and prominent)
         if (alerts.out_of_stock.length > 0) {
             html += `
                 <div class="out-of-stock-section">
@@ -677,7 +677,26 @@ async function searchProductsAsync(searchTerm) {
             throw new Error(data.message || 'Failed to search products');
         }
 
-        const products = data.data || [];
+        // Normalize response to an array of products (API may return different shapes)
+        let products = [];
+        if (Array.isArray(data.data)) {
+            products = data.data;
+        } else if (data.data && Array.isArray(data.data.products)) {
+            products = data.data.products;
+        } else if (data.data && Array.isArray(data.data.items)) {
+            products = data.data.items;
+        } else if (data.data && typeof data.data === 'object') {
+            // if object keyed by id, convert to array
+            products = Object.values(data.data);
+        } else {
+            products = [];
+        }
+
+        if (!Array.isArray(products)) {
+            console.warn('searchProductsAsync: normalized products is not an array, coercing to []', products);
+            products = [];
+        }
+
         displaySearchResults(products);
         
     } catch (error) {
@@ -2289,61 +2308,103 @@ async function generateStockReport() {
             throw new Error(data.message || 'Failed to generate report');
         }
         
-        displayStockReport(data.data);
-        // Show the simple print button and attach handler
-        const btn = document.getElementById('btnSimpleStockValuation');
-        if (btn) {
-            btn.style.display = '';
-            btn.onclick = () => printSimpleStockValuationReport(data.data);
-        }
-    // Print Stock Valuation Report (Product, Opening, Purchases, Sales, Adjustments, Current Stock)
-    function printSimpleStockValuationReport(reportData) {
-        const products = reportData.products || [];
-        let html = `
-            <div class="report-header">
-                <h3>Stock Valuation Report (Simple)</h3>
-                <p>Generated: ${new Date().toLocaleString()}</p>
-            </div>
-            <div class="report-products">
-                <table class="report-table">
-                    <thead>
-                        <tr>
-                            <th>Product</th>
-                            <th>Opening</th>
-                            <th>Purchases</th>
-                            <th>Sales</th>
-                            <th>Adjustments</th>
-                            <th>Current Stock</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${products.map(p => `
-                            <tr>
-                                <td>${p.name || 'Unknown'}</td>
-                                <td>${safeNumber(p.opening_stock, 0)}</td>
-                                <td style="color: green;">+${safeNumber(p.total_purchases, 0)}</td>
-                                <td style="color: red;">-${safeNumber(p.total_sales, 0)}</td>
-                                <td style="color: orange;">${safeNumber(p.total_adjustments, 0) >= 0 ? '+' : ''}${safeNumber(p.total_adjustments, 0)}</td>
-                                <td style="font-weight: bold;">${safeNumber(p.current_stock, 0)}</td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            </div>
-        `;
-        const container = document.getElementById('stockReportContent');
-        container.innerHTML = html;
-    }
+        // store last data and render (default: show all products)
+        lastStockReportData = data.data;
+        displayStockReport(lastStockReportData, false);
     } catch (error) {
         console.error('Failed to generate stock report:', error);
         alert('Failed to generate report: ' + error.message);
     }
+
 }
 
-function displayStockReport(reportData) {
+
+// Export Stock Valuation Report to PDF
+function exportStockValuationToPDF() {
+    try {
+        const container = document.getElementById('stockReportContent');
+        if (!container) {
+            alert('Report not found');
+            return;
+        }
+
+        const table = container.querySelector('.report-products table.report-table') || container.querySelector('table.report-table');
+        if (!table) {
+            alert('No report table found to export');
+            return;
+        }
+
+        // Columns required in PDF (text-based)
+        const columns = ['Product', 'Opening', 'Purchases', 'Sales', 'Adjustments', 'Current Stock'];
+
+        // Extract rows from table tbody; take first 6 cells per row
+        const rows = Array.from(table.querySelectorAll('tbody tr')).map(tr => {
+            const cells = Array.from(tr.querySelectorAll('td')).slice(0, 6).map(td => td.textContent.trim());
+            // Ensure we always return same column count
+            while (cells.length < columns.length) cells.push('');
+            return cells;
+        });
+
+        // Locate jsPDF constructor
+        const jsPDFCtor = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF || null;
+        if (!jsPDFCtor) {
+            alert('jsPDF not found. Please include jspdf and jspdf-autotable in the page.');
+            return;
+        }
+
+        const doc = new jsPDFCtor({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        doc.setFontSize(12);
+        const title = `Stock Valuation Report - ${new Date().toLocaleString()}`;
+        doc.text(title, 14, 16);
+
+        // Use autotable if available
+        if (typeof doc.autoTable === 'function') {
+            doc.autoTable({
+                head: [columns],
+                body: rows,
+                startY: 22,
+                styles: { fontSize: 10 },
+                headStyles: { fillColor: [60, 80, 100] }
+            });
+            doc.save(`stock_valuation_report_${new Date().toISOString().split('T')[0]}.pdf`);
+            return;
+        }
+
+        // autotable not on doc — try global plugin indicator
+        if (window.jspdfAutoTable || (window.jspdf && window.jspdf.autoTable)) {
+            try {
+                doc.autoTable({ head: [columns], body: rows, startY: 22 });
+                doc.save(`stock_valuation_report_${new Date().toISOString().split('T')[0]}.pdf`);
+                return;
+            } catch (e) {
+                console.error('autoTable plugin exists but failed:', e);
+            }
+        }
+
+        alert('autoTable plugin for jsPDF is not available. Please include jspdf-autotable to export a text PDF.');
+
+    } catch (error) {
+        console.error('PDF generation failed:', error);
+        alert('Failed to generate PDF: ' + (error && error.message ? error.message : error));
+    }
+}
+
+function displayStockReport(reportData, onlyWithTransactions = false) {
     const container = document.getElementById('stockReportContent');
     
+    if (!reportData) {
+        container.innerHTML = '<p>No report data</p>';
+        return;
+    }
+
     const products = reportData.products || [];
+    // Optionally filter to only products that have transactions
+    const filteredProducts = onlyWithTransactions ? products.filter(p => {
+        const purchases = safeNumber(p.total_purchases, 0);
+        const sales = safeNumber(p.total_sales, 0);
+        const adjustments = Math.abs(safeNumber(p.total_adjustments, 0));
+        return (purchases + sales + adjustments) > 0;
+    }) : products;
     const summary = reportData.summary || {};
     const movement = summary.stock_movement || {};
     
@@ -2351,7 +2412,7 @@ function displayStockReport(reportData) {
     let totalCostValue = 0;
     let totalRetailValue = 0;
     
-    const enrichedProducts = products.map(p => {
+    const enrichedProducts = filteredProducts.map(p => {
         const stock = safeNumber(p.current_stock, 0);
         const costPrice = safeNumber(p.cost_price);
         const sellingPrice = safeNumber(p.selling_price);
@@ -2376,6 +2437,11 @@ function displayStockReport(reportData) {
     let html = `
         <div class="report-header">
             <h3>Stock Valuation Report</h3>
+            <label style="float: right; margin-left: 12px; margin-top:6px; font-weight: normal;">
+                <input id="filterTransactionsCheckbox" type="checkbox" ${onlyWithTransactions ? 'checked' : ''} onchange="displayStockReport(lastStockReportData, this.checked)" />
+                &nbsp;Only products with transactions
+            </label>
+            <button class="btn btn-primary" style="float: right; margin-top: 6px;" onclick="exportStockValuationToPDF()">📄 Export PDF</button>
             <p>Generated: ${new Date().toLocaleString()}</p>
         </div>
         
@@ -2417,7 +2483,6 @@ function displayStockReport(reportData) {
                             <th>Sales</th>
                             <th>Adjustments</th>
                             <th>Current Stock</th>
-                            <th>Value (Cost)</th>
                             <th>Status</th>
                         </tr>
                     </thead>
@@ -2920,11 +2985,12 @@ async function confirmResetPassword() {
 
         alert('✓ Password reset successfully!');
         closeModal('resetPasswordModal');
-        
+        await loadUsersTable();
     } catch (error) {
         console.error('Failed to reset password:', error);
         alert('Error: ' + error.message);
     }
+
 }
 
-console.log('✓ Admin dashboard loaded');
+// Admin dashboard loaded
