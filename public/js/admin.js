@@ -1933,6 +1933,11 @@ async function submitStockTaking() {
         const token = sessionStorage.getItem('authToken');
         if (!token) throw new Error('No auth token');
 
+        if (!currentPeriod || !currentPeriod.id) {
+            alert('No active period found. Please create or open a period before stock taking.');
+            return;
+        }
+
         const inputs = document.querySelectorAll('.physical-count');
         let hasData = false;
         const counts = [];
@@ -1944,7 +1949,7 @@ async function submitStockTaking() {
                 counts.push({
                     product_id: parseInt(input.dataset.productId),
                     physical_count: physicalCount,
-                    period_id: currentPeriod ? currentPeriod.id : 1
+                    period_id: currentPeriod.id
                 });
             }
         });

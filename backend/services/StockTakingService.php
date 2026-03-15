@@ -25,26 +25,47 @@ class StockTakingService {
         $db = Database::getInstance();
         
         $user = Auth::getCurrentUser();
+        if (!$user) {
+            throw new Exception('User not authenticated');
+        }
+        
+        // Validate inputs
+        if ($product_id <= 0) {
+            throw new Exception('Invalid product ID');
+        }
+        if ($period_id <= 0) {
+            throw new Exception('Invalid period ID');
+        }
+        
+        // Validate period exists and is open
+        $period = $db->fetch("SELECT id, status FROM periods WHERE id = ?", [$period_id]);
+        if (!$period) {
+            throw new Exception('Period not found. Please select a valid open period.');
+        }
+        if ($period['status'] === 'CLOSED') {
+            throw new Exception('Cannot perform stock taking in a closed period');
+        }
+        
+        // Get product
+        $product = ProductService::getProduct($product_id);
+        if (!$product) {
+            throw new Exception("Product not found");
+        }
+        
+        $system_stock = $product['current_stock'];
+        $variance = $physical_count - $system_stock;
         
         $db->beginTransaction();
         
         try {
-            // Get product
-            $product = ProductService::getProduct($product_id);
-            if (!$product) {
-                throw new Exception("Product not found");
-            }
-            
-            $system_stock = $product['current_stock'];
-            $variance = $physical_count - $system_stock;
-            
             // Record the physical count
             $stmt = $db->getConnection()->prepare(
                 "INSERT INTO stock_adjustments (product_id, system_quantity, physical_quantity, variance, period_id, recorded_by) 
                  VALUES (?, ?, ?, ?, ?, ?)"
             );
             
-            $stmt->bind_param('iiiiii', $product_id, $system_stock, $physical_count, $variance, $period_id, $user['user_id']);
+            $user_id = $user['user_id'];
+            $stmt->bind_param('iiiiii', $product_id, $system_stock, $physical_count, $variance, $period_id, $user_id);
             
             if (!$stmt->execute()) {
                 throw new Exception("Failed to record count: " . $stmt->error);
@@ -52,18 +73,27 @@ class StockTakingService {
             
             $adjustment_id = $db->getConnection()->insert_id;
             
-            // If variance exists, create ADJUSTMENT transaction to correct stock
+            // If variance exists, update stock directly instead of nested transaction
             if ($variance !== 0) {
-                // Create adjustment transaction
                 $unit_price = $product['cost_price'];
                 
-                TransactionService::createTransaction(
-                    'ADJUSTMENT',
-                    $product_id,
-                    $variance, // Preserve sign: negative = shortage, positive = surplus
-                    $unit_price,
-                    $period_id
+                // Insert adjustment transaction directly (avoid nested beginTransaction)
+                $conn = $db->getConnection();
+                $txn_stmt = $conn->prepare(
+                    "INSERT INTO transactions 
+                     (type, product_id, quantity, unit_price, total_amount, transaction_date, period_id, created_by, status)
+                     VALUES ('ADJUSTMENT', ?, ?, ?, ?, NOW(), ?, ?, 'COMMITTED')"
                 );
+                
+                $total_amount = $variance * $unit_price;
+                $txn_stmt->bind_param('iiddii', $product_id, $variance, $unit_price, $total_amount, $period_id, $user_id);
+                
+                if (!$txn_stmt->execute()) {
+                    throw new Exception("Failed to create adjustment transaction: " . $txn_stmt->error);
+                }
+                
+                // Recalculate product stock from all committed transactions
+                TransactionService::recalculateProductStock($product_id);
             }
             
             AuditLog::log('RECORD_PHYSICAL_COUNT', 'stock_adjustments', $adjustment_id, null, [

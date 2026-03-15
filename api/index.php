@@ -559,10 +559,15 @@ $router->add('POST', '/inventory/physical-count', function() {
         
         $body = Router::getBody();
         
+        if (empty($body['product_id']) || empty($body['period_id'])) {
+            Response::error('product_id and period_id are required', 400);
+            return;
+        }
+        
         $result = StockTakingService::recordPhysicalCount(
-            $body['product_id'] ?? 0,
-            $body['physical_count'] ?? 0,
-            $body['period_id'] ?? 0
+            intval($body['product_id']),
+            intval($body['physical_count'] ?? 0),
+            intval($body['period_id'])
         );
         
         Response::success($result, 'Physical count recorded');
