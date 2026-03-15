@@ -1860,9 +1860,25 @@ async function startStockTaking() {
         let html = `
             <div style="margin: 20px 0;">
                 <p style="color: #666; margin-bottom: 15px;">
-                    <strong>Instruction:</strong> For each product below, enter the physical count from your physical inventory.
-                    The system will calculate the variance (difference from system stock).
+                    <strong>Instruction:</strong> Search for products, enter the physical count for each.
+                    The system will calculate the variance. Submit when all counts are entered.
                 </p>
+                <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 15px;">
+                    <div style="flex: 1; position: relative;">
+                        <input type="text" id="stockTakingSearch" 
+                               placeholder="🔍 Search products by name..." 
+                               style="width: 100%; padding: 10px 15px; border: 2px solid #2196F3; border-radius: 8px; font-size: 14px; outline: none;"
+                               oninput="filterStockTakingProducts()" />
+                    </div>
+                    <div id="stockTakingProgress" style="font-size: 14px; color: #666; white-space: nowrap;">
+                        <span id="countedProducts">0</span> / <span id="totalProducts">${products.length}</span> counted
+                    </div>
+                </div>
+                <div style="margin-bottom: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" style="font-size: 12px; padding: 4px 10px;" onclick="filterStockTakingByStatus('all')">All (${products.length})</button>
+                    <button class="btn btn-secondary" style="font-size: 12px; padding: 4px 10px;" onclick="filterStockTakingByStatus('counted')">✓ Counted</button>
+                    <button class="btn btn-secondary" style="font-size: 12px; padding: 4px 10px;" onclick="filterStockTakingByStatus('uncounted')">○ Not Counted</button>
+                </div>
                 <table class="data-table">
                     <thead>
                         <tr>
@@ -1877,7 +1893,7 @@ async function startStockTaking() {
 
         products.forEach(p => {
             html += `
-                <tr>
+                <tr class="stock-taking-row" data-product-name="${p.name.toLowerCase()}">
                     <td>${p.name}</td>
                     <td style="text-align: center;"><strong>${p.current_stock}</strong></td>
                     <td>
@@ -1903,28 +1919,85 @@ async function startStockTaking() {
 
         form.innerHTML = html;
 
-        // Add event listeners for variance calculation
+        // Add event listeners for variance calculation and progress tracking
         const inputs = document.querySelectorAll('.physical-count');
         inputs.forEach(input => {
-            input.addEventListener('change', function() {
+            input.addEventListener('input', function() {
                 const systemStock = parseInt(this.dataset.systemStock);
-                const physicalCount = parseInt(this.value) || 0;
-                const variance = physicalCount - systemStock;
+                const physicalCount = parseInt(this.value);
                 
                 const varianceDisplay = document.querySelector(
                     `.variance-display[data-product-id="${this.dataset.productId}"]`
                 );
                 if (varianceDisplay) {
-                    varianceDisplay.textContent = variance >= 0 ? '+' + variance : variance;
-                    varianceDisplay.style.color = variance === 0 ? 'green' : variance > 0 ? 'orange' : 'red';
+                    if (this.value === '' || isNaN(physicalCount)) {
+                        varianceDisplay.textContent = '-';
+                        varianceDisplay.style.color = '#999';
+                    } else {
+                        const variance = physicalCount - systemStock;
+                        varianceDisplay.textContent = variance >= 0 ? '+' + variance : variance;
+                        varianceDisplay.style.color = variance === 0 ? 'green' : variance > 0 ? 'orange' : 'red';
+                    }
                 }
+                
+                // Update progress counter
+                updateStockTakingProgress();
             });
         });
+
+        // Focus the search box
+        document.getElementById('stockTakingSearch').focus();
 
         console.log('✓ Stock taking form initialized');
     } catch (error) {
         console.error('Failed to start stock taking:', error);
         alert('Failed to start stock taking: ' + error.message);
+    }
+}
+
+function filterStockTakingProducts() {
+    const searchTerm = document.getElementById('stockTakingSearch').value.toLowerCase().trim();
+    const rows = document.querySelectorAll('.stock-taking-row');
+    
+    rows.forEach(row => {
+        const productName = row.dataset.productName;
+        const matchesSearch = !searchTerm || productName.includes(searchTerm);
+        row.style.display = matchesSearch ? '' : 'none';
+    });
+}
+
+function filterStockTakingByStatus(status) {
+    const searchTerm = document.getElementById('stockTakingSearch').value.toLowerCase().trim();
+    const rows = document.querySelectorAll('.stock-taking-row');
+    
+    rows.forEach(row => {
+        const productName = row.dataset.productName;
+        const input = row.querySelector('.physical-count');
+        const hasCounted = input.value !== '' && !isNaN(parseInt(input.value));
+        const matchesSearch = !searchTerm || productName.includes(searchTerm);
+        
+        let matchesStatus = true;
+        if (status === 'counted') matchesStatus = hasCounted;
+        else if (status === 'uncounted') matchesStatus = !hasCounted;
+        
+        row.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
+    });
+}
+
+function updateStockTakingProgress() {
+    const inputs = document.querySelectorAll('.physical-count');
+    let counted = 0;
+    inputs.forEach(input => {
+        if (input.value !== '' && !isNaN(parseInt(input.value))) counted++;
+    });
+    
+    const countedEl = document.getElementById('countedProducts');
+    if (countedEl) countedEl.textContent = counted;
+    
+    const progressEl = document.getElementById('stockTakingProgress');
+    if (progressEl) {
+        const total = inputs.length;
+        progressEl.style.color = counted === total ? 'green' : counted > 0 ? '#2196F3' : '#666';
     }
 }
 
