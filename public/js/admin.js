@@ -1837,25 +1837,43 @@ async function startStockTaking() {
         const token = sessionStorage.getItem('authToken');
         if (!token) throw new Error('No auth token');
 
+        console.log('🔍 Starting stock taking...');
+
         // Load active products
         if (!adminProducts || adminProducts.length === 0) {
+            console.log('📥 Loading products...');
             await loadProductsForDropdown();
         }
+
+        console.log(`📦 Loaded ${adminProducts ? adminProducts.length : 0} total products`);
 
         // Show stock taking panel
         const panel = document.getElementById('stockTakingPanel');
         if (!panel) {
             alert('Stock Taking panel not found');
+            console.error('❌ stockTakingPanel element not found');
             return;
         }
 
         panel.style.display = 'block';
+        console.log('✓ Panel displayed');
         
         // Create form for physical count entry
         const form = document.getElementById('stockTakingForm');
-        if (!form) return;
+        if (!form) {
+            alert('Stock Taking form container not found');
+            console.error('❌ stockTakingForm element not found');
+            return;
+        }
 
         const products = adminProducts.filter(p => p.status === 'active');
+        console.log(`✓ Found ${products.length} active products`);
+
+        if (products.length === 0) {
+            alert('No active products found. Please add products before stock taking.');
+            form.innerHTML = '<p style="color: red;">No active products to count.</p>';
+            return;
+        }
 
         let html = `
             <div style="margin: 20px 0;">
